@@ -1,0 +1,11 @@
+{
+  "appId": "com.enrconnect.app",
+  "appName": "EnR Connect",
+  "webDir": "dist",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}
