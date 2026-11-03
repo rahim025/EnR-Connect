@@ -61,6 +61,11 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
+      - name: Vérifier la signature et la config Google
+        run: |
+          grep certificate_hash android/app/google-services.json || echo "AUCUN certificate_hash dans google-services.json"
+          keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep SHA1
+
       - name: Renommer l'APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk EnR-Connect.apk
 
