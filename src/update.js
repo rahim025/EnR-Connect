@@ -1,5 +1,5 @@
 // Vérifie s'il existe une version plus récente de l'appli et propose de la télécharger.
-// L'étudiant peut toujours choisir « Plus tard » et continuer avec son ancienne version.
+// Un bouton « Mettre à jour » clignote en haut ; l'étudiant peut l'ignorer (✕) et continuer avec son ancienne version.
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 
@@ -11,36 +11,45 @@ function afficher(numero, lien) {
 
   const style = document.createElement('style');
   style.textContent = `
-    #maj { position: fixed; left: 10px; right: 10px; top: max(10px, env(safe-area-inset-top)); z-index: 50;
-      background: #0E2A2F; color: #fff; border: 2px solid #F5A623; border-radius: 14px; padding: 12px 14px;
-      display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 24px #0006; font-family: system-ui, sans-serif; }
-    #maj p { margin: 0; font-size: .95rem; line-height: 1.35; }
-    #maj .actions { display: flex; gap: 8px; justify-content: flex-end; }
-    #maj button { font: inherit; border: 0; border-radius: 10px; padding: 9px 14px; cursor: pointer; }
-    #maj .oui { background: #F5A623; color: #0E2A2F; font-weight: 700; }
-    #maj .non { background: transparent; color: #B9CCCB; }
-    #maj button:focus-visible { outline: 3px solid #F5A623; outline-offset: 2px; }`;
+    #maj { position: fixed; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; align-items: stretch;
+      border-radius: 999px; overflow: hidden; background: #F5A623; box-shadow: 0 4px 18px #0005;
+      font-family: system-ui, sans-serif; animation: maj-clignote 1.4s ease-in-out infinite; }
+    #maj button { font: inherit; border: 0; cursor: pointer; color: #0E2A2F; background: transparent; }
+    #maj .oui { font-weight: 700; font-size: .9rem; padding: 8px 8px 8px 16px; display: flex; align-items: center; gap: 6px; }
+    #maj .non { padding: 8px 12px 8px 6px; font-size: 1rem; opacity: .7; }
+    #maj button:focus-visible { outline: 3px solid #0E2A2F; outline-offset: -3px; }
+    @keyframes maj-clignote {
+      0%, 100% { opacity: 1; box-shadow: 0 4px 18px #0005, 0 0 0 0 #F5A623aa; }
+      50% { opacity: .55; box-shadow: 0 4px 18px #0005, 0 0 0 10px #F5A62300; } }
+    @media (prefers-reduced-motion: reduce) { #maj { animation: none; } }`;
   document.head.appendChild(style);
 
-  const bandeau = document.createElement('div');
-  bandeau.id = 'maj';
-  bandeau.setAttribute('role', 'alert');
-  bandeau.innerHTML = `
-    <p>Une nouvelle version d'EnR Connect est disponible.</p>
-    <div class="actions">
-      <button class="non" type="button">Plus tard</button>
-      <button class="oui" type="button">Mise à jour</button>
-    </div>`;
-  document.body.appendChild(bandeau);
+  const bouton = document.createElement('div');
+  bouton.id = 'maj';
+  bouton.setAttribute('role', 'status');
+  bouton.innerHTML = `
+    <button class="oui" type="button" aria-label="Mettre à jour EnR Connect">⬆ Mettre à jour</button>
+    <button class="non" type="button" aria-label="Ignorer cette mise à jour">✕</button>`;
+  document.body.appendChild(bouton);
 
-  bandeau.querySelector('.non').onclick = () => {
-    localStorage.setItem('maj-ignoree', String(numero)); // ne plus redemander pour cette version
-    bandeau.remove();
+  // Se place juste sous l'en-tête de la messagerie (ou en haut de l'écran sur la page de connexion)
+  const placer = () => {
+    const entete = document.querySelector('.entete');
+    const bas = entete ? entete.getBoundingClientRect().bottom : 0;
+    bouton.style.top = (bas + 8) + 'px';
   };
-  bandeau.querySelector('.oui').onclick = () => {
+  placer();
+  const suivi = setInterval(() => { if (!document.getElementById('maj')) clearInterval(suivi); else placer(); }, 800);
+  window.addEventListener('resize', placer);
+
+  bouton.querySelector('.non').onclick = () => {
+    // L'étudiant garde son ancienne version : on ne redemande pas pour cette version-là
+    localStorage.setItem('maj-ignoree', String(numero));
+    bouton.remove();
+  };
+  bouton.querySelector('.oui').onclick = () => {
     if (Capacitor.isNativePlatform()) Browser.open({ url: lien });
     else window.open(lien, '_blank');
-    bandeau.remove();
   };
 }
 
@@ -62,4 +71,11 @@ async function verifier() {
   }
 }
 
-window.addEventListener('load', () => setTimeout(verifier, 2500));
+let derniere = 0;
+function verifierSiBesoin() {
+  if (Date.now() - derniere < 10 * 60 * 1000) return;
+  derniere = Date.now();
+  verifier();
+}
+window.addEventListener('load', () => setTimeout(verifierSiBesoin, 2500));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) verifierSiBesoin(); });
