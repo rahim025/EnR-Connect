@@ -1,4 +1,5 @@
 import './update.js';
+import * as P from './presence.js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
@@ -242,6 +243,7 @@ function arreterNotifs() { if (NATIF) Watcher.stop().catch(() => {}); }
 
 /* ---------- Discussion ---------- */
 function stopAll() {
+  P.arreter();
   unsubs.forEach(u => u()); unsubs = [];
   timers.forEach(clearInterval); timers = [];
   if (msgUnsub) { msgUnsub(); msgUnsub = null; }
@@ -269,6 +271,7 @@ function startChat() {
   renderShell();
   subscribeMessages();
   demarrerNotifs();
+  P.demarrer({ db, uid: state.user.uid, nom: nomAffiche(state.user), role: state.role, onChange: majPresenceUI });
 }
 
 // Mode ultra léger : en arrière-plan, l'appli coupe sa connexion (zéro donnée consommée).
@@ -291,6 +294,10 @@ function renderShell() {
   const admin = state.role === 'admin';
   app.innerHTML = `
     <div class="layout">
+      <div class="ciel" aria-hidden="true">
+        <i class="rayons"></i><i class="orbe o1"></i><i class="orbe o2"></i><i class="orbe o3"></i>
+        <span class="etincelles"><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s></span>
+      </div>
       <header class="entete">
         <div class="marque">
           <span class="avatar-groupe"><span class="logo"></span><i class="point" id="point"></i></span>
@@ -305,6 +312,7 @@ function renderShell() {
         </div>
       </header>
       <section class="fil" id="fil" aria-live="polite"></section>
+      <div class="frappe" id="frappe" hidden aria-live="polite"><span class="eclairs"><i></i><i></i><i></i></span><span id="frappe-txt"></span></div>
       <form class="envoi" id="form">
         <div class="bandeau-annonce" id="bandeau" hidden>${ICON.megaphone}<span>Ce message sera publié comme annonce</span></div>
         <div class="ligne-envoi">
@@ -324,6 +332,9 @@ function renderShell() {
     box.style.height = 'auto';
     box.style.height = Math.min(box.scrollHeight, 120) + 'px';
     majBoutonEnvoi();
+    const ecrit = !!box.value.trim();
+    const lay = document.querySelector('.layout'); if (lay) lay.classList.toggle('ecrit', ecrit);
+    P.saisie(ecrit);
   });
   box.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(min-width: 700px)').matches) { e.preventDefault(); envoyer(); }
@@ -336,7 +347,32 @@ function renderShell() {
   const bn = document.getElementById('btn-annonce');
   if (bn) bn.onclick = () => { state.announce = !state.announce; majAnnonce(); };
   document.getElementById('fil').onclick = onFeedClick;
+  document.getElementById('sous').onclick = () => openPanel('settings');
+  state.dernierId = null; state.dernierT = 0;
   renderStatut();
+}
+
+/* Présence : nombre de personnes en ligne et « écrit… » */
+function majPresenceUI() {
+  renderStatut();
+  const noms = P.quiEcrit();
+  const el = document.getElementById('frappe'); const lay = document.querySelector('.layout');
+  if (el) {
+    el.hidden = noms.length === 0;
+    const t = noms.length === 1 ? `${noms[0]} écrit…`
+      : noms.length === 2 ? `${noms[0]} et ${noms[1]} écrivent…`
+      : noms.length > 2 ? `${noms[0]}, ${noms[1]} et ${noms.length - 2} autre${noms.length > 3 ? 's' : ''} écrivent…` : '';
+    const txt = document.getElementById('frappe-txt'); if (txt && t) txt.textContent = t;
+  }
+  if (lay) lay.classList.toggle('quelquun', noms.length > 0);
+  if (document.getElementById('membres')) remplirMembres();
+}
+
+/* Petit éclat de lumière quand on envoie ou qu'un message arrive */
+function eclat(classe, cible, duree = 900) {
+  const el = typeof cible === 'string' ? document.querySelector(cible) : cible; if (!el) return;
+  el.classList.remove(classe); void el.offsetWidth; el.classList.add(classe);
+  setTimeout(() => el.classList.remove(classe), duree);
 }
 
 function majAnnonce() {
@@ -357,7 +393,7 @@ function majBoutonEnvoi() {
 function renderStatut() {
   const sous = document.getElementById('sous'); if (!sous) return;
   const on = navigator.onLine;
-  sous.textContent = (on ? 'En ligne' : 'Hors ligne') + ' · Mode ultra léger';
+  sous.innerHTML = (on ? (P.disponible() ? `<b class="nb-ligne">${P.nbEnLigne()}</b> en ligne` : 'En ligne') : 'Hors ligne') + ' · Mode ultra léger';
   const p = document.getElementById('point'); if (p) p.classList.toggle('hors', !on);
 }
 
@@ -430,6 +466,16 @@ function renderFeed() {
     : `<div class="vide"><span class="logo grand"></span><strong>Aucun message pour l'instant</strong><span>Écris le premier.</span></div>`;
 
   if (proche) fil.scrollTop = fil.scrollHeight;
+  // Un nouveau message arrive : il apparaît dans un éclat de lumière
+  const dernier = ms[ms.length - 1];
+  if (dernier) {
+    const t = +dateDe(dernier);
+    if (state.dernierId && dernier.id !== state.dernierId && t >= state.dernierT) {
+      const b = fil.querySelector(`[data-id="${dernier.id}"]`);
+      if (b) { b.classList.add('arrive'); eclat('flash', '.layout', 1100); }
+    }
+    state.dernierId = dernier.id; state.dernierT = t;
+  }
   // Mode normal : charger automatiquement les photos
   if (!state.eco) ms.filter(m => m.kind === 'image' && !mediaCache.has(m.mediaId)).forEach(m => loadMedia(m.mediaId));
 }
@@ -469,9 +515,12 @@ function envoyerMessage(text, kind = 'text') {
 function envoyer() {
   const box = document.getElementById('texte');
   const text = box.value.trim();
+  eclat('eclat', '#btn-send', 700);
+  P.finSaisie();
   if (!text) { envoyerMessage('👍'); return; } // zone vide : le bouton envoie un « J'aime »
   envoyerMessage(text, state.announce && state.role === 'admin' ? 'announce' : 'text');
   box.value = ''; box.style.height = '';
+  const lay = document.querySelector('.layout'); if (lay) lay.classList.remove('ecrit');
   state.announce = false; majAnnonce(); majBoutonEnvoi();
 }
 
@@ -563,6 +612,9 @@ function renderSettings(p) {
         </select>
       </div>` : ''}
 
+      <h3 class="titre-section">Membres <span id="nb-membres"></span></h3>
+      <div id="membres"><p class="note">Chargement…</p></div>
+
       ${admin ? `
       <h3 class="titre-section">Administration</h3>
       <button class="rangee" id="go-admin">
@@ -582,6 +634,7 @@ function renderSettings(p) {
       </button>
     </div>`;
   p.querySelector('#close').onclick = closePanel;
+  chargerListeMembres();
   p.querySelector('#eco').onchange = e => { state.eco = e.target.checked; localStorage.setItem('eco', state.eco ? 'on' : 'off'); renderFeed(); };
   const ga = p.querySelector('#go-admin'); if (ga) ga.onclick = () => openPanel('admin');
   const sn = p.querySelector('#notif');
@@ -594,7 +647,29 @@ function renderSettings(p) {
     state.notifSec = Number(e.target.value); localStorage.setItem('notifSec', String(state.notifSec));
     if (state.notif) demarrerNotifs();
   };
-  p.querySelector('#logout').onclick = () => { closePanel(); arreterNotifs(); signOut(auth); };
+  p.querySelector('#logout').onclick = () => { closePanel(); arreterNotifs(); P.arreter(); signOut(auth); };
+}
+
+/* Membres du groupe (réglages) */
+let listeMembres = [];
+async function chargerListeMembres() {
+  try { listeMembres = await P.chargerMembres(); } catch (e) { listeMembres = null; }
+  remplirMembres();
+}
+function remplirMembres() {
+  const zone = document.getElementById('membres'); if (!zone) return;
+  if (listeMembres === null) { zone.innerHTML = '<p class="note">Impossible de charger la liste pour l\'instant.</p>'; return; }
+  const moi = state.user.uid;
+  const liste = listeMembres.map(m => ({ ...m, enLigne: P.estEnLigne(m.uid) }))
+    .sort((a, b) => (b.enLigne - a.enLigne) || (b.vu - a.vu) || a.nom.localeCompare(b.nom, 'fr'));
+  const nb = document.getElementById('nb-membres');
+  if (nb) nb.textContent = `(${liste.length} · ${liste.filter(m => m.enLigne).length} en ligne)`;
+  zone.innerHTML = liste.map((m, i) => `
+    <div class="rangee statique membre ${m.enLigne ? 'on' : ''}" style="--i:${Math.min(i, 12)}">
+      <span class="avatar-pres">${avatarHTML(m.nom, m.uid).replace('class="avatar', 'class="avatar gros')}<i class="pastille-pres"></i></span>
+      <span class="libelle"><strong>${esc(m.nom)}</strong><small>${m.enLigne ? 'En ligne maintenant' : (m.vu ? 'Vu ' + esc(etiquette(new Date(m.vu))).toLowerCase() : 'Pas encore connecté')}</small></span>
+      ${m.uid === moi ? '<span class="badge">Toi</span>' : m.role === 'admin' ? '<span class="badge">Admin</span>' : ''}
+    </div>`).join('') || '<p class="note">Aucun membre pour l\'instant.</p>';
 }
 
 function renderAdmin(p) {
