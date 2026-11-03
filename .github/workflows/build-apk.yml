@@ -35,6 +35,11 @@ jobs:
         run: |
           npx cap add android
           npx @capacitor/assets generate --android
+          # Notifications, bulle Messenger et réponse rapide (code natif du dossier native/)
+          mkdir -p android/app/src/main/java/com/enrconnect/app android/app/src/main/res/drawable
+          cp native/java/*.java android/app/src/main/java/com/enrconnect/app/
+          cp native/res/drawable/ic_stat.xml android/app/src/main/res/drawable/
+          python3 native/patch-manifest.py
           # Corrige « Your device doesn't support credential manager » (connexion Google)
           sed -i "s/ext {/ext {\n    androidxCredentialsVersion = '1.3.0'\n    androidxCredentialsPlayServicesAuthVersion = '1.3.0'/" android/variables.gradle
           cat >> android/build.gradle <<'EOF'
