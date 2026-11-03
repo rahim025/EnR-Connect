@@ -7,26 +7,26 @@ import {
 } from 'firebase/auth';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, onSnapshot,
-  query, orderBy, limit, where, serverTimestamp
+  query, orderBy, limit, where, serverTimestamp, disableNetwork, enableNetwork
 } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 
 const app = document.getElementById('app');
-const ONLINE_WINDOW_MS = 75 * 1000; // une personne est « connectée » si elle a donné signe de vie il y a moins de 75 s
-const HEARTBEAT_MS = 30 * 1000;
+const PAGE = 30; // nombre de messages chargés à la fois (mode ultra léger)
 
 const state = {
   user: null,
   role: null,            // 'admin' | 'member' | 'refused'
   eco: localStorage.getItem('eco') !== 'off', // mode économique : photos masquées tant qu'on n'appuie pas
   messages: [],
-  users: [],
+  limit: PAGE,
   announce: false,
   panel: null            // null | 'admin' | 'settings'
 };
 const mediaCache = new Map(); // mediaId -> dataURL
 let unsubs = [];
 let timers = [];
+let msgUnsub = null;
 
 const esc = (s = '') => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mailOf = u => (u.email || '').toLowerCase();
@@ -160,45 +160,43 @@ onAuthStateChanged(auth, async user => {
 function stopAll() {
   unsubs.forEach(u => u()); unsubs = [];
   timers.forEach(clearInterval); timers = [];
+  if (msgUnsub) { msgUnsub(); msgUnsub = null; }
 }
 
-function startChat() {
-  stopAll();
-  renderShell();
-
-  unsubs.push(onSnapshot(
-    query(collection(db, 'messages'), orderBy('createdAt', 'desc'), limit(100)),
+function subscribeMessages() {
+  if (msgUnsub) msgUnsub();
+  msgUnsub = onSnapshot(
+    query(collection(db, 'messages'), orderBy('createdAt', 'desc'), limit(state.limit)),
     { includeMetadataChanges: true },
     snap => {
       state.messages = snap.docs.map(d => ({ id: d.id, pending: d.metadata.hasPendingWrites, ...d.data() })).reverse();
       renderFeed();
     },
     e => console.error(e)
-  ));
-
-  unsubs.push(onSnapshot(collection(db, 'users'), snap => {
-    state.users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderStats();
-  }, e => console.error(e)));
-
-  beat();
-  timers.push(setInterval(() => { if (document.visibilityState === 'visible') beat(); }, HEARTBEAT_MS));
-  timers.push(setInterval(renderStats, 20000));
-  document.addEventListener('visibilitychange', onVisible);
-  window.addEventListener('online', renderStatut);
-  window.addEventListener('offline', renderStatut);
+  );
 }
 
-function onVisible() { if (document.visibilityState === 'visible' && state.user) beat(); }
-
-function beat() {
-  const u = state.user; if (!u) return;
-  setDoc(doc(db, 'users', u.uid), {
-    name: u.displayName || mailOf(u).split('@')[0],
-    email: mailOf(u),
-    lastSeen: serverTimestamp()
-  }, { merge: true }).catch(() => {});
+function startChat() {
+  stopAll();
+  state.limit = PAGE;
+  renderShell();
+  subscribeMessages();
 }
+
+// Mode ultra léger : en arrière-plan, l'appli coupe sa connexion (zéro donnée consommée).
+// Les messages en attente partent dès qu'on rouvre l'appli.
+let coupureTimer = null;
+document.addEventListener('visibilitychange', () => {
+  if (!state.user) return;
+  clearTimeout(coupureTimer);
+  if (document.visibilityState === 'hidden') {
+    coupureTimer = setTimeout(() => disableNetwork(db).catch(() => {}), 15000); // 15 s pour laisser partir un message tout juste envoyé
+  } else {
+    enableNetwork(db).catch(() => {});
+  }
+});
+window.addEventListener('online', renderStatut);
+window.addEventListener('offline', renderStatut);
 
 function renderShell() {
   app.innerHTML = `
@@ -206,7 +204,7 @@ function renderShell() {
       <header>
         <div>
           <h2>EnR Connect</h2>
-          <div class="stats" id="stats"></div>
+          <div class="stats" id="stats"><span>Mode ultra léger</span></div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
           <span class="statut" id="statut"></span>
@@ -239,17 +237,7 @@ function renderShell() {
     bn.classList.toggle('primary', state.announce);
   };
   document.getElementById('fil').onclick = onFeedClick;
-  renderStats(); renderStatut();
-}
-
-function renderStats() {
-  const el = document.getElementById('stats'); if (!el) return;
-  const now = Date.now();
-  const enLigne = state.users.filter(u => {
-    const t = u.lastSeen && u.lastSeen.toMillis ? u.lastSeen.toMillis() : now; // null = écriture en cours = maintenant
-    return now - t < ONLINE_WINDOW_MS;
-  }).length;
-  el.innerHTML = `<span><span class="dot"></span>${enLigne} connecté${enLigne > 1 ? 's' : ''}</span><span>${state.users.length} membre${state.users.length > 1 ? 's' : ''}</span>`;
+  renderStatut();
 }
 
 function renderStatut() {
@@ -266,7 +254,7 @@ function bubbleHTML(m) {
   let contenu = '';
   if (m.kind === 'image') {
     if (mediaCache.has(m.mediaId)) contenu = `<img src="${mediaCache.get(m.mediaId)}" alt="Photo envoyée par ${esc(m.name)}" />`;
-    else contenu = `<button class="media-masque" data-media="${esc(m.mediaId)}">Photo masquée. Appuie pour la charger (utilise des données).</button>`;
+    else contenu = `<button class="media-masque" data-media="${esc(m.mediaId)}">Photo masquée${m.taille ? ' (' + m.taille + ' Ko)' : ''}. Appuie pour la charger (utilise des données).</button>`;
   } else {
     contenu = `<div>${esc(m.text).replace(/\n/g, '<br>')}</div>`;
   }
@@ -282,8 +270,10 @@ function bubbleHTML(m) {
 function renderFeed() {
   const fil = document.getElementById('fil'); if (!fil) return;
   const proche = fil.scrollHeight - fil.scrollTop - fil.clientHeight < 140;
+  const plus = state.messages.length >= state.limit
+    ? '<button class="media-masque" data-plus="1">Voir les messages précédents</button>' : '';
   fil.innerHTML = state.messages.length
-    ? state.messages.map(bubbleHTML).join('')
+    ? plus + state.messages.map(bubbleHTML).join('')
     : '<p class="vide">Aucun message pour l\'instant. Écris le premier.</p>';
   if (proche) fil.scrollTop = fil.scrollHeight;
   // Mode normal : charger automatiquement les photos
@@ -302,6 +292,7 @@ async function loadMedia(id) {
 
 async function onFeedClick(e) {
   const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.plus) { state.limit += PAGE; t.textContent = 'Chargement…'; subscribeMessages(); return; }
   if (t.dataset.media) { t.textContent = 'Chargement…'; loadMedia(t.dataset.media); }
   if (t.dataset.del && confirm('Supprimer ce message ?')) deleteDoc(doc(db, 'messages', t.dataset.del)).catch(console.error);
 }
@@ -319,7 +310,7 @@ function sendText() {
 }
 
 /* ---------- Photos (compressées pour économiser les mégas) ---------- */
-function compress(file, maxSide = 900, quality = 0.6) {
+function compress(file, maxSide = 640, quality = 0.5) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -341,13 +332,14 @@ async function onPickPhoto(e) {
   if (!file) return;
   try {
     let data = await compress(file);
-    if (data.length > 900000) data = await compress(file, 600, 0.45); // limite Firestore ~1 Mo
+    if (data.length > 120000) data = await compress(file, 480, 0.4); // photos très légères (≈ 30 à 90 Ko)
+    const taille = Math.max(1, Math.round(data.length * 0.75 / 1024));
     const mref = doc(collection(db, 'media'));
     mediaCache.set(mref.id, data);
     const name = state.user.displayName || mailOf(state.user).split('@')[0];
     setDoc(mref, { uid: state.user.uid, data, createdAt: serverTimestamp() }).catch(console.error);
     addDoc(collection(db, 'messages'), {
-      uid: state.user.uid, name, kind: 'image', mediaId: mref.id, createdAt: serverTimestamp()
+      uid: state.user.uid, name, kind: 'image', mediaId: mref.id, taille, createdAt: serverTimestamp()
     }).catch(console.error);
   } catch (err) {
     alert('Impossible de préparer cette photo.');
