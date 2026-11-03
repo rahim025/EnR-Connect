@@ -37,7 +37,18 @@ jobs:
           npx @capacitor/assets generate --android
           # Corrige « Your device doesn't support credential manager » (connexion Google)
           sed -i "s/ext {/ext {\n    androidxCredentialsVersion = '1.3.0'\n    androidxCredentialsPlayServicesAuthVersion = '1.3.0'/" android/variables.gradle
-          grep -n "androidxCredentials" android/variables.gradle
+          cat >> android/build.gradle <<'EOF'
+
+          allprojects {
+              configurations.all {
+                  resolutionStrategy {
+                      force 'androidx.credentials:credentials:1.3.0'
+                      force 'androidx.credentials:credentials-play-services-auth:1.3.0'
+                  }
+              }
+          }
+          EOF
+          tail -12 android/build.gradle
           echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
           npx cap sync android
 
