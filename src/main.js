@@ -44,7 +44,7 @@ async function signInGoogle() {
     }
   } catch (e) {
     const code = e && (e.code || e.errorMessage || '');
-    if (err) err.textContent = 'Connexion impossible. Erreur : ' + code + ' ' + ((e && e.message) || e);
+    if (err) err.textContent = 'Connexion impossible. Réessaie. (' + (code || 'erreur') + ')';
     console.error(e);
   }
 }
@@ -77,11 +77,10 @@ async function resolveRole(user) {
   const mail = mailOf(user);
   try {
     if ((await getDoc(doc(db, 'admins', mail))).exists()) return 'admin';
-    if ((await getDoc(doc(db, 'allowed', mail))).exists()) return 'member';
-    return 'refused';
+    return 'member';
   } catch (e) {
     // Hors ligne : on se fie au dernier rôle connu sur ce téléphone
-    return localStorage.getItem('role:' + mail) || 'refused';
+    return localStorage.getItem('role:' + mail) || 'member';
   }
 }
 
@@ -331,15 +330,15 @@ function renderAdmin(p) {
     <header><button class="ghost" id="close">Retour</button><h2>Administration</h2></header>
     <div class="corps">
       <section>
-        <h3>Ajouter un étudiant</h3>
-        <p class="note">Seules les adresses Gmail de cette liste peuvent entrer dans le groupe.</p>
+        <h3>Ajouter un administrateur</h3>
+        <p class="note">Tout le monde peut entrer dans le groupe avec son compte Google. Un administrateur peut publier des annonces, supprimer des messages et nommer d'autres administrateurs.</p>
         <form class="ajout" id="ajout">
           <input type="email" id="nouveau" placeholder="prenom.nom@gmail.com" required />
           <button class="primary" type="submit">Ajouter</button>
         </form>
       </section>
       <section>
-        <h3>Membres autorisés <span id="nb"></span></h3>
+        <h3>Administrateurs <span id="nb"></span></h3>
         <div id="liste"></div>
       </section>
     </div>`;
@@ -348,20 +347,19 @@ function renderAdmin(p) {
     e.preventDefault();
     const input = p.querySelector('#nouveau');
     const mail = input.value.trim().toLowerCase(); if (!mail) return;
-    await setDoc(doc(db, 'allowed', mail), { addedBy: mailOf(state.user), addedAt: serverTimestamp() }).catch(() => alert('Ajout impossible.'));
+    await setDoc(doc(db, 'admins', mail), { addedBy: mailOf(state.user), addedAt: serverTimestamp() }).catch(() => alert('Ajout impossible.'));
     input.value = '';
   };
-  panelUnsub = onSnapshot(collection(db, 'allowed'), snap => {
+  panelUnsub = onSnapshot(collection(db, 'admins'), snap => {
     const liste = p.querySelector('#liste'); if (!liste) return;
     p.querySelector('#nb').textContent = `(${snap.size})`;
-    liste.innerHTML = snap.docs.map(d => `<div class="ligne"><span>${esc(d.id)}</span><button class="danger" data-rm="${esc(d.id)}">Retirer</button></div>`).join('')
-      || '<p class="note">Aucun membre pour l\'instant.</p>';
+    const moi = mailOf(state.user);
+    liste.innerHTML = snap.docs.map(d => `<div class="ligne"><span>${esc(d.id)}</span>${d.id === moi ? '<span class="note">toi</span>' : `<button class="danger" data-rm="${esc(d.id)}">Retirer</button>`}</div>`).join('')
+      || '<p class="note">Aucun administrateur.</p>';
   });
   p.querySelector('#liste').onclick = async e => {
     const mail = e.target.dataset.rm; if (!mail) return;
-    if (!confirm(`Retirer ${mail} du groupe ?`)) return;
-    await deleteDoc(doc(db, 'allowed', mail)).catch(console.error);
-    const q = await getDocs(query(collection(db, 'users'), where('email', '==', mail))).catch(() => null);
-    if (q) q.forEach(d => deleteDoc(d.ref).catch(() => {}));
+    if (!confirm(`Retirer ${mail} des administrateurs ?`)) return;
+    await deleteDoc(doc(db, 'admins', mail)).catch(() => alert('Action impossible.'));
   };
 }
