@@ -307,3 +307,103 @@ button.rangee:active, label.rangee:active { background: var(--surface2); }
 @media (prefers-reduced-motion: reduce) {
   .login::before, .login::after, .login > *, .login .sun, .login button.primary::after { animation: none !important; }
 }
+
+/* =====================================================================
+   THÈME « SOLEIL » — identité propre à EnR Connect (énergie solaire)
+   Cellules solaires, courant vert, lueur ambre. Aucun balisage modifié.
+   ===================================================================== */
+:root {
+  --bg: #FFFBF2; --surface2: #F4ECDA; --autre: #FFFFFF;
+  --texte: #10272B; --texte2: #5F7472; --ligne: #EADFC6;
+  --accent: #C77D00; --vert: #2E9E6B;
+  --annonce-bg: #FFF1CF; --annonce-txt: #7A4A00;
+  --courant: #2E9E6B;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0B2327; --surface2: #17353A; --autre: #12303A;
+    --texte: #EAF3F1; --texte2: #9DB7B5; --ligne: #1F4047;
+    --accent: #F5A623; --vert: #45D08A;
+    --annonce-bg: #2A2A1C; --annonce-txt: #FFD98A;
+    --courant: #45D08A;
+  }
+}
+
+/* Correctif des « Infos du groupe » : les rangées ne se chevauchent plus */
+.panneau .corps > * { flex: none; }
+
+/* Fond de la messagerie : lueurs douces + logo ENSET en filigrane */
+.layout { position: relative; isolation: isolate; }
+.layout > * { position: relative; z-index: 1; }
+.layout::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 35% at 100% 0%, #F5A62324, transparent 70%),
+    radial-gradient(55% 35% at 0% 100%, #2E9E6B22, transparent 70%);
+}
+.layout::after {
+  content: ""; position: absolute; left: 50%; top: 50%; z-index: 0; pointer-events: none;
+  width: min(80vw, 340px); aspect-ratio: 1; transform: translate(-50%, -50%);
+  background: url('./assets/enset-logo.webp') center / contain no-repeat; opacity: .06;
+}
+
+/* En-tête : bandeau lumineux avec liseré ambre → vert */
+.entete {
+  background: linear-gradient(180deg, #F5A6231f, transparent), var(--bg);
+  border-bottom: 0; position: relative;
+}
+.entete::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: linear-gradient(90deg, #F5A623, #2E9E6B 60%, transparent);
+}
+.avatar-groupe .logo { box-shadow: 0 0 0 3px #F5A62344, 0 0 18px #F5A62366; }
+.point { animation: point-pulse 2.4s ease-out infinite; }
+@keyframes point-pulse { 0% { box-shadow: 0 0 0 0 #45D08A99; } 100% { box-shadow: 0 0 0 9px #45D08A00; } }
+
+/* Repères de temps : petites pastilles avec un soleil */
+.temps {
+  display: inline-flex; align-items: center; gap: 7px; padding: 3px 12px; border-radius: 99px;
+  border: 1px solid var(--ligne); background: var(--bg);
+  font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 600;
+}
+.temps::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FFD98A, #F5A623); }
+
+/* Messages des autres : cartes sombres avec « ligne de courant » verte */
+.fil .bulle.autre:not(.photo) {
+  background: var(--autre); border: 1px solid var(--ligne); border-left: 4px solid var(--courant);
+  border-radius: 4px 16px 16px 4px; padding: 8px 13px;
+}
+.fil .bulle.autre.debut, .fil .bulle.autre.seul { border-top-left-radius: 14px; }
+.fil .bulle.autre.fin, .fil .bulle.autre.seul { border-bottom-left-radius: 14px; }
+.qui { font-weight: 700; color: var(--courant); letter-spacing: .02em; }
+
+/* Mes messages : cellule solaire dorée, coin supérieur droit coupé */
+.fil .bulle.moi:not(.photo) {
+  background: linear-gradient(135deg, #FFD27A 0%, #F5A623 55%, #E8890C 100%); color: #1B1405;
+  border-radius: 16px 4px 16px 16px; box-shadow: 0 3px 14px #F5A62340, inset 0 1px 0 #ffffff66;
+  padding: 8px 14px; font-weight: 500;
+}
+.fil .bulle.moi.milieu, .fil .bulle.moi.fin { border-top-right-radius: 4px; }
+.fil .bulle.moi.debut, .fil .bulle.moi.milieu { margin-bottom: 0; }
+
+/* Annonces : panneau solaire quadrillé */
+.bulle.annonce {
+  border-left: 0; border-top: 3px solid #F5A623; border-radius: 6px 6px 16px 16px;
+  background-color: var(--annonce-bg);
+  background-image: linear-gradient(#F5A62320 1px, transparent 1px), linear-gradient(90deg, #F5A62320 1px, transparent 1px);
+  background-size: 16px 16px; box-shadow: 0 4px 18px #F5A62322;
+}
+
+/* Barre d'envoi : capsule flottante, bouton rond doré */
+.envoi { background: transparent; border-top: 0; padding: 6px 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+.ligne-envoi { gap: 4px; align-items: center; }
+.ligne-envoi textarea {
+  background: var(--autre); border: 1.5px solid var(--ligne); margin: 0 2px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.ligne-envoi textarea:focus-visible { outline: 0; border-color: #F5A623; box-shadow: 0 0 0 4px #F5A62326; }
+.send { background: linear-gradient(135deg, #FFD27A, #F5A623); color: #1B1405; box-shadow: 0 3px 12px #F5A62355; }
+.send:active { background: #E8890C; transform: scale(.94); }
+.bandeau-annonce { border: 1px dashed #F5A623; }
+
+@media (prefers-reduced-motion: reduce) { .point { animation: none; } }
