@@ -2,7 +2,8 @@ import './update.js';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
-  GoogleAuthProvider, signInWithCredential, signInWithPopup, onAuthStateChanged, signOut
+  GoogleAuthProvider, signInWithCredential, signInWithPopup, onAuthStateChanged, signOut,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile
 } from 'firebase/auth';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, onSnapshot,
@@ -29,6 +30,20 @@ let timers = [];
 
 const esc = (s = '') => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const mailOf = u => (u.email || '').toLowerCase();
+// Comptes « pseudo » : un faux e-mail interne est construit à partir du pseudo (aucune adresse réelle n'est utilisée).
+const PSEUDO_DOMAIN = 'pseudo.enrconnect.app';
+const estPseudo = u => mailOf(u).endsWith('@' + PSEUDO_DOMAIN);
+const nomAffiche = u => u.displayName || mailOf(u).split('@')[0];
+let modePseudo = 'connexion'; // 'connexion' | 'inscription'
+
+const styleLogin = document.createElement('style');
+styleLogin.textContent = `
+  .login .ou { margin: 18px 0 8px; opacity: .7; font-size: .9rem; }
+  .pseudo-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+  .pseudo-form input { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 0; border-radius: 12px; font: inherit; background: #f5f7f6; color: #12272b; }
+  .pseudo-form .lien { background: none; border: 0; color: inherit; font: inherit; text-decoration: underline; opacity: .85; padding: 6px; cursor: pointer; }
+`;
+document.head.appendChild(styleLogin);
 const heure = ts => (ts && ts.toDate ? ts.toDate() : new Date()).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 /* ---------- Connexion ---------- */
@@ -51,15 +66,62 @@ async function signInGoogle() {
 
 function renderLogin(message = '') {
   stopAll();
+  const ins = modePseudo === 'inscription';
   app.innerHTML = `
     <main class="login">
       <div class="sun" aria-hidden="true"></div>
       <h1>EnR Connect</h1>
       <p>Le groupe de discussion de la classe d'énergies renouvelables.</p>
       <button class="primary" id="btn-login">Continuer avec Google</button>
+      <p class="ou">ou, sans Google</p>
+      <form class="pseudo-form" id="pseudo-form">
+        <input id="pseudo" type="text" placeholder="Pseudo" autocapitalize="none" autocomplete="username" maxlength="20" required />
+        <input id="mdp" type="password" placeholder="Mot de passe (6 caractères minimum)" autocomplete="${ins ? 'new-password' : 'current-password'}" minlength="6" required />
+        <button class="primary" type="submit">${ins ? 'Créer mon compte' : 'Se connecter'}</button>
+        <button class="lien" type="button" id="bascule">${ins ? "J'ai déjà un compte" : 'Créer un compte avec un pseudo'}</button>
+      </form>
       <p class="msg-erreur" id="err">${esc(message)}</p>
     </main>`;
   document.getElementById('btn-login').onclick = signInGoogle;
+  document.getElementById('pseudo-form').onsubmit = submitPseudo;
+  document.getElementById('bascule').onclick = () => { modePseudo = ins ? 'connexion' : 'inscription'; renderLogin(); };
+}
+
+function messagePseudo(e) {
+  switch (e && e.code) {
+    case 'auth/email-already-in-use': return 'Ce pseudo est déjà pris. Choisis-en un autre.';
+    case 'auth/invalid-credential':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password': return 'Pseudo ou mot de passe incorrect.';
+    case 'auth/weak-password': return 'Mot de passe trop court (6 caractères minimum).';
+    case 'auth/network-request-failed': return 'Pas de connexion Internet. Réessaie.';
+    case 'auth/too-many-requests': return 'Trop d\'essais. Attends quelques minutes puis réessaie.';
+    case 'auth/operation-not-allowed': return 'Inscription par pseudo non activée (un administrateur doit activer « E-mail/Mot de passe » dans Firebase).';
+    default: return 'Connexion impossible. Réessaie. (' + ((e && e.code) || 'erreur') + ')';
+  }
+}
+
+async function submitPseudo(ev) {
+  ev.preventDefault();
+  const err = document.getElementById('err');
+  const pseudo = document.getElementById('pseudo').value.trim();
+  const mdp = document.getElementById('mdp').value;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{1,18}[A-Za-z0-9]$/.test(pseudo)) {
+    err.textContent = 'Pseudo : 3 à 20 caractères (lettres, chiffres, point, tiret), sans espace.';
+    return;
+  }
+  err.textContent = '';
+  const mail = pseudo.toLowerCase() + '@' + PSEUDO_DOMAIN;
+  try {
+    if (modePseudo === 'inscription') {
+      const cred = await createUserWithEmailAndPassword(auth, mail, mdp);
+      await updateProfile(cred.user, { displayName: pseudo }).catch(() => {});
+    } else {
+      await signInWithEmailAndPassword(auth, mail, mdp);
+    }
+  } catch (e) {
+    err.textContent = messagePseudo(e);
+  }
 }
 
 function renderRefused() {
@@ -76,7 +138,7 @@ function renderRefused() {
 async function resolveRole(user) {
   const mail = mailOf(user);
   try {
-    if ((await getDoc(doc(db, 'admins', mail))).exists()) return 'admin';
+    if (user.emailVerified && (await getDoc(doc(db, 'admins', mail))).exists()) return 'admin';
     return 'member';
   } catch (e) {
     // Hors ligne : on se fie au dernier rôle connu sur ce téléphone
@@ -87,7 +149,7 @@ async function resolveRole(user) {
 onAuthStateChanged(auth, async user => {
   state.user = user;
   if (!user) return renderLogin();
-  if (!user.emailVerified) return renderLogin('Utilise un compte Google dont l\'adresse est vérifiée.');
+  if (!user.emailVerified && !estPseudo(user)) return renderLogin('Utilise un compte Google dont l\'adresse est vérifiée.');
   state.role = await resolveRole(user);
   localStorage.setItem('role:' + mailOf(user), state.role);
   if (state.role === 'refused') return renderRefused();
@@ -317,7 +379,7 @@ function renderSettings(p) {
         <span><strong>Mode économique</strong><br><span class="note">Les photos restent masquées jusqu'à ce que tu appuies dessus. Le texte passe toujours avec très peu de données.</span></span>
         <input type="checkbox" id="eco" ${state.eco ? 'checked' : ''} />
       </label>
-      <p class="note">Connecté avec ${esc(state.user.email)} ${state.role === 'admin' ? '(administrateur)' : ''}</p>
+      <p class="note">Connecté avec ${esc(estPseudo(state.user) ? 'le pseudo ' + nomAffiche(state.user) : state.user.email)} ${state.role === 'admin' ? '(administrateur)' : ''}</p>
       <button class="danger" id="logout">Se déconnecter</button>
     </div>`;
   p.querySelector('#close').onclick = closePanel;
