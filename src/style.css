@@ -249,3 +249,61 @@ button.rangee:active, label.rangee:active { background: var(--surface2); }
 @media (prefers-reduced-motion: no-preference) {
   button { transition: background-color .15s; }
 }
+
+/* ---------- Écran de connexion : fond ENSET + animations (ajout, rien d'existant modifié) ---------- */
+.login { position: relative; isolation: isolate; }
+.login > * { position: relative; z-index: 2; }
+
+/* Couche couleur animée : lueurs ambre / vert qui dérivent lentement */
+.login::before {
+  content: ""; position: fixed; inset: -20%; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(40% 30% at 20% 25%, #F5A62340, transparent 70%),
+    radial-gradient(45% 35% at 85% 70%, #2E9E6B40, transparent 70%),
+    radial-gradient(35% 30% at 50% 100%, #FFE3A82e, transparent 70%);
+  animation: aurore 14s ease-in-out infinite alternate, teinte 11s ease-in-out infinite alternate;
+}
+
+/* Logo ENSET en arrière-plan : flotte, respire, avec un reflet qui passe */
+.login::after {
+  content: ""; position: fixed; z-index: 1; pointer-events: none;
+  left: 50%; top: 46%; width: min(118vw, 560px); aspect-ratio: 1;
+  background: url('./assets/enset-logo.webp') center / contain no-repeat;
+  opacity: .15;
+  filter: drop-shadow(0 0 28px #F5A62355);
+  transform: translate(-50%, -50%);
+  animation: logo-flotte 9s ease-in-out infinite, logo-halo 6s ease-in-out infinite;
+}
+
+/* Entrée en cascade des éléments existants */
+.login > * { animation: monte .7s cubic-bezier(.2,.7,.2,1) both; }
+.login > :nth-child(2) { animation-delay: .08s; }
+.login > :nth-child(3) { animation-delay: .16s; }
+.login > :nth-child(4) { animation-delay: .24s; }
+.login > :nth-child(5) { animation-delay: .32s; }
+.login > :nth-child(6) { animation-delay: .40s; }
+.login > :nth-child(7) { animation-delay: .48s; }
+
+/* Soleil qui pulse (même taille, même couleurs) */
+.login .sun { animation: monte .7s both, soleil 3.2s ease-in-out .7s infinite; }
+
+/* Reflet doré qui traverse les boutons principaux */
+.login button.primary { position: relative; overflow: hidden; }
+.login button.primary::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, #ffffff66 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: reflet 4.5s ease-in-out 1.2s infinite;
+}
+
+@keyframes aurore { from { transform: translate3d(-4%, -3%, 0) scale(1); } to { transform: translate3d(5%, 4%, 0) scale(1.15); } }
+@keyframes teinte { from { filter: hue-rotate(-20deg); } to { filter: hue-rotate(45deg); } }
+@keyframes logo-flotte { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, calc(-50% - 12px)) scale(1.04); } }
+@keyframes logo-halo { 0%, 100% { opacity: .12; } 50% { opacity: .2; } }
+@keyframes monte { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes soleil { 0%, 100% { box-shadow: 0 0 0 10px #F5A62333, 0 0 0 22px #F5A62318; } 50% { box-shadow: 0 0 0 14px #F5A62344, 0 0 0 32px #F5A62318; } }
+@keyframes reflet { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .login::before, .login::after, .login > *, .login .sun, .login button.primary::after { animation: none !important; }
+}
