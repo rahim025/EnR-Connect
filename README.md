@@ -53,3 +53,13 @@ Chaque étudiant ouvre le lien, télécharge l'APK et autorise l'installation de
 - La clé `keystore/debug.keystore` est volontairement dans le dépôt : elle garde la même empreinte SHA-1 à chaque build, sinon la connexion Google casserait à chaque version. Elle sert à une appli de classe, pas au Play Store.
 - Les photos sont réduites (environ 900 px) et stockées dans Firestore pour rester gratuit, sans Firebase Storage. Les vidéos ne sont pas incluses dans cette première version.
 - Les règles de sécurité vérifient côté serveur que seuls les membres de la liste lisent et écrivent.
+
+## Notifications, bulle et réponse rapide (Android)
+
+Sans serveur ni carte bancaire : un petit service natif (dossier `native/`, copié dans le projet Android par le workflow) vérifie les nouveaux messages toutes les 30 s, 1 min ou 5 min (réglable dans Infos du groupe). Quand un message arrive et que l'appli n'est pas affichée :
+
+- une notification de conversation apparaît, avec un champ **Répondre** directement dedans ;
+- sur Android 11 et plus, elle peut devenir une **bulle flottante** qui ouvre la discussion en petit ;
+- le message part vers Firestore avec la session de l'utilisateur (aucune clé secrète dans l'appli).
+
+À savoir : l'icône discrète du service reste dans la barre d'état ; Android peut retarder les vérifications quand le téléphone dort longtemps (économie de batterie) ; après un redémarrage du téléphone, il faut ouvrir l'appli une fois pour relancer le service ; si la bulle n'apparaît pas, activer « Bulles » pour EnR Connect dans les paramètres de notifications du téléphone.
