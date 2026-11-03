@@ -43,7 +43,8 @@ async function signInGoogle() {
       await signInWithPopup(auth, new GoogleAuthProvider());
     }
   } catch (e) {
-    if (err) err.textContent = 'Connexion impossible. Vérifie ta connexion Internet puis réessaie.';
+    const code = e && (e.code || e.errorMessage || '');
+    if (err) err.textContent = 'Connexion impossible. Erreur : ' + code + ' ' + ((e && e.message) || e);
     console.error(e);
   }
 }
