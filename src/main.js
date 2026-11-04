@@ -1,5 +1,7 @@
 import './update.js';
 import * as P from './presence.js';
+import { lancerVisite } from './visite.js';
+import { monterLumiere, reglerNiveau, niveau as niveauLumiere, NIVEAUX as NIVEAUX_LUMIERE } from './lumiere.js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
@@ -46,6 +48,19 @@ styleLogin.textContent = `
   .login .ou { margin: 18px 0 8px; opacity: .7; font-size: .9rem; }
   .pseudo-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
   .pseudo-form input { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 0; border-radius: 12px; font: inherit; background: #f5f7f6; color: #12272b; }
+  .pseudo-form .champ-mdp { position: relative; width: 100%; }
+  .pseudo-form .champ-mdp input { padding-right: 48px; }
+  .pseudo-form .oeil { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; cursor: pointer; color: #4a5f63; }
+  .pseudo-form .oeil svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .force { width: 100%; margin-top: -2px; }
+  .force .barre { height: 8px; border-radius: 99px; background: rgba(255,255,255,.18); overflow: hidden; }
+  .force .barre i { display: block; height: 100%; width: 0; border-radius: 99px; background: #e5484d; transition: width .3s ease, background .3s ease; }
+  .force .niveau { margin: 6px 0 4px; font-size: .85rem; font-weight: 600; }
+  .force ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: .82rem; }
+  .force li { opacity: .7; transition: opacity .2s, color .2s; }
+  .force li::before { content: '○ '; }
+  .force li.ok { opacity: 1; color: #6fdc8c; }
+  .force li.ok::before { content: '✔ '; }
   .pseudo-form .lien { background: none; border: 0; color: inherit; font: inherit; text-decoration: underline; opacity: .85; padding: 6px; cursor: pointer; }
 `;
 document.head.appendChild(styleLogin);
@@ -81,7 +96,22 @@ function renderLogin(message = '') {
       <p class="ou">ou, sans Google</p>
       <form class="pseudo-form" id="pseudo-form">
         <input id="pseudo" type="text" placeholder="Pseudo" autocapitalize="none" autocomplete="username" maxlength="20" required />
-        <input id="mdp" type="password" placeholder="Mot de passe (6 caractères minimum)" autocomplete="${ins ? 'new-password' : 'current-password'}" minlength="6" required />
+        <div class="champ-mdp">
+          <input id="mdp" type="password" placeholder="Mot de passe (6 caractères minimum)" autocomplete="${ins ? 'new-password' : 'current-password'}" minlength="6" required />
+          <button type="button" class="oeil" id="oeil" aria-label="Afficher le mot de passe"></button>
+        </div>
+        ${ins ? `<div class="force" id="force">
+          <div class="barre"><i id="force-barre"></i></div>
+          <div class="niveau" id="force-niveau">Saisis un mot de passe</div>
+          <ul>
+            <li data-r="long">6 caractères minimum (obligatoire)</li>
+            <li data-r="long8">8 caractères ou plus (recommandé)</li>
+            <li data-r="min">Une lettre minuscule</li>
+            <li data-r="maj">Une lettre majuscule</li>
+            <li data-r="chiffre">Un chiffre</li>
+            <li data-r="symbole">Un symbole (ex. ! ? @ #)</li>
+          </ul>
+        </div>` : ''}
         <button class="primary" type="submit">${ins ? 'Créer mon compte' : 'Se connecter'}</button>
         <button class="lien" type="button" id="bascule">${ins ? "J'ai déjà un compte" : 'Créer un compte avec un pseudo'}</button>
       </form>
@@ -89,6 +119,54 @@ function renderLogin(message = '') {
     </main>`;
   document.getElementById('btn-login').onclick = signInGoogle;
   document.getElementById('pseudo-form').onsubmit = submitPseudo;
+  const OEIL = '<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const OEIL_BARRE = '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-7 0-11-7-11-7a19.8 19.8 0 0 1 5.06-5.94M9.9 4.24A10.9 10.9 0 0 1 12 5c7 0 11 7 11 7a19.7 19.7 0 0 1-3.17 4.19M14.12 14.12A3 3 0 1 1 9.88 9.88"/><path d="M1 1l22 22"/></svg>';
+  const champMdp = document.getElementById('mdp');
+  const boutonOeil = document.getElementById('oeil');
+  boutonOeil.innerHTML = OEIL;
+  boutonOeil.onclick = () => {
+    const visible = champMdp.type === 'text';
+    champMdp.type = visible ? 'password' : 'text';
+    boutonOeil.innerHTML = visible ? OEIL : OEIL_BARRE;
+    boutonOeil.setAttribute('aria-label', visible ? 'Afficher le mot de passe' : 'Masquer le mot de passe');
+  };
+  if (ins) {
+    const barre = document.getElementById('force-barre');
+    const niveau = document.getElementById('force-niveau');
+    const regles = {
+      long: v => v.length >= 6,
+      long8: v => v.length >= 8,
+      min: v => /[a-z]/.test(v),
+      maj: v => /[A-Z]/.test(v),
+      chiffre: v => /[0-9]/.test(v),
+      symbole: v => /[^A-Za-z0-9]/.test(v)
+    };
+    const niveaux = [
+      { txt: 'Très faible', col: '#e5484d' },
+      { txt: 'Faible', col: '#f76b15' },
+      { txt: 'Moyen', col: '#f5a524' },
+      { txt: 'Fort', col: '#8bd450' },
+      { txt: 'Très fort', col: '#30c26a' }
+    ];
+    const maj = () => {
+      const v = champMdp.value;
+      let ok = 0;
+      document.querySelectorAll('#force li').forEach(li => {
+        const bon = regles[li.dataset.r](v);
+        li.classList.toggle('ok', bon);
+        if (bon) ok++;
+      });
+      if (!v) { barre.style.width = '0'; niveau.textContent = 'Saisis un mot de passe'; niveau.style.color = ''; return; }
+      // 0 à 6 règles validées -> 5 niveaux ; sous 6 caractères le niveau reste « Très faible »
+      const n = regles.long(v) ? Math.min(4, Math.max(1, Math.round((ok - 1) * 4 / 5))) : 0;
+      barre.style.width = ((n + 1) * 20) + '%';
+      barre.style.background = niveaux[n].col;
+      niveau.textContent = niveaux[n].txt;
+      niveau.style.color = niveaux[n].col;
+    };
+    champMdp.addEventListener('input', maj);
+    maj();
+  }
   document.getElementById('bascule').onclick = () => { modePseudo = ins ? 'connexion' : 'inscription'; renderLogin(); };
 }
 
@@ -166,6 +244,7 @@ const S = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const F = d => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
 const ICON = {
   retour: S('<path d="M15 5l-7 7 7 7"/>'),
+  soleil: S('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
   chevron: S('<path d="M9 5l7 7-7 7"/>'),
   gear: S('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
   camera: S('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'),
@@ -271,6 +350,7 @@ function startChat() {
   renderShell();
   subscribeMessages();
   demarrerNotifs();
+  setTimeout(() => lancerVisite({ uid: state.user.uid, admin: state.role === 'admin' }), 700);
   P.demarrer({ db, uid: state.user.uid, nom: nomAffiche(state.user), role: state.role, onChange: majPresenceUI });
 }
 
@@ -349,6 +429,7 @@ function renderShell() {
   document.getElementById('fil').onclick = onFeedClick;
   document.getElementById('sous').onclick = () => openPanel('settings');
   state.dernierId = null; state.dernierT = 0;
+  monterLumiere();
   renderStatut();
 }
 
@@ -398,12 +479,24 @@ function renderStatut() {
 }
 
 /* Une bulle (texte, photo) */
+// Liens cliquables : on travaille sur le texte déjà échappé (sûr), seuls http(s):// et www. sont reconnus.
+function lierURL(html) {
+  return html.replace(/\b((?:https?:\/\/|www\.)[^\s<]+)/gi, brut => {
+    let url = brut, apres = '';
+    const fin = /(?:[.,;:!?)\]]|&quot;|&#39;|&gt;)$/;
+    while (fin.test(url)) { const m = url.match(fin)[0]; apres = m + apres; url = url.slice(0, -m.length); }
+    if (!/^(?:https?:\/\/|www\.)[^\s]{2,}/i.test(url)) return brut;
+    const href = /^www\./i.test(url) ? 'https://' + url : url;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>${apres}`;
+  });
+}
+
 function contenuHTML(m) {
   if (m.kind === 'image') {
     if (mediaCache.has(m.mediaId)) return `<img src="${mediaCache.get(m.mediaId)}" alt="Photo envoyée par ${esc(m.name)}" />`;
     return `<button class="media-masque" data-media="${esc(m.mediaId)}">${ICON.image}<span><strong>Photo masquée</strong><small>${m.taille ? m.taille + ' Ko · ' : ''}Appuie pour charger</small></span></button>`;
   }
-  return `<div class="texte">${esc(m.text).replace(/\n/g, '<br>')}</div>`;
+  return `<div class="texte">${lierURL(esc(m.text)).replace(/\n/g, '<br>')}</div>`;
 }
 
 function detailHTML(m, moi) {
@@ -491,6 +584,7 @@ async function loadMedia(id) {
 }
 
 async function onFeedClick(e) {
+  if (e.target.closest('a')) return; // un lien s'ouvre sans sélectionner la bulle
   const t = e.target.closest('button');
   if (t) {
     if (t.dataset.plus) { t.textContent = 'Chargement…'; state.limit += PAGE; subscribeMessages(); return; }
@@ -598,6 +692,14 @@ function renderSettings(p) {
         <input type="checkbox" class="switch" id="eco" ${state.eco ? 'checked' : ''} />
       </label>
 
+      <div class="rangee statique">
+        <span class="pastille">${ICON.soleil}</span>
+        <span class="libelle"><strong>Effets de lumière</strong><small>Aurores, halo solaire, faisceau et ondes. Choisis « Doux » ou « Éteint » pour économiser la batterie.</small></span>
+        <select class="choix" id="lumiere" aria-label="Effets de lumière">
+          ${NIVEAUX_LUMIERE.map(([v, t]) => `<option value="${v}" ${niveauLumiere() === v ? 'selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </div>
+
       ${NATIF ? `
       <label class="rangee">
         <span class="pastille">${ICON.bell}</span>
@@ -623,6 +725,13 @@ function renderSettings(p) {
         <span class="fleche">${ICON.chevron}</span>
       </button>` : ''}
 
+      <h3 class="titre-section">Aide</h3>
+      <button class="rangee" id="revoir-visite">
+        <span class="pastille">${ICON.megaphone}</span>
+        <span class="libelle"><strong>Revoir la visite guidée</strong><small>Explique chaque partie de l'écran et son rôle</small></span>
+        <span class="fleche">${ICON.chevron}</span>
+      </button>
+
       <h3 class="titre-section">Compte</h3>
       <div class="rangee statique">
         <span class="pastille">${ICON.user}</span>
@@ -636,6 +745,7 @@ function renderSettings(p) {
   p.querySelector('#close').onclick = closePanel;
   chargerListeMembres();
   p.querySelector('#eco').onchange = e => { state.eco = e.target.checked; localStorage.setItem('eco', state.eco ? 'on' : 'off'); renderFeed(); };
+  p.querySelector('#lumiere').onchange = ev => reglerNiveau(ev.target.value);
   const ga = p.querySelector('#go-admin'); if (ga) ga.onclick = () => openPanel('admin');
   const sn = p.querySelector('#notif');
   if (sn) sn.onchange = e => {
@@ -647,6 +757,7 @@ function renderSettings(p) {
     state.notifSec = Number(e.target.value); localStorage.setItem('notifSec', String(state.notifSec));
     if (state.notif) demarrerNotifs();
   };
+  p.querySelector('#revoir-visite').onclick = () => { closePanel(); setTimeout(() => lancerVisite({ uid: state.user.uid, admin, force: true }), 350); };
   p.querySelector('#logout').onclick = () => { closePanel(); arreterNotifs(); P.arreter(); signOut(auth); };
 }
 

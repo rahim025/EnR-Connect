@@ -563,3 +563,82 @@ button.rangee:active, label.rangee:active { background: var(--surface2); }
   .layout.flash .rayons, .layout.flash .entete::after, .send.eclat::after { animation: none !important; }
   .etincelles { display: none; }
 }
+
+/* Liens dans les messages */
+.bulle .texte a { color: inherit; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; word-break: break-word; }
+.bulle.autre .texte a { color: var(--accent); }
+
+/* =====================================================================
+   JEU DE LUMIÈRE — NIVEAU MASTER CLASS
+   Couches ajoutées par lumiere.js : halo solaire qui respire, deux aurores,
+   faisceau lumineux qui balaie l'écran, onde à l'arrivée d'un message,
+   vignette de profondeur, reflet sur l'en-tête. Profondeur au mouvement du téléphone.
+   Uniquement transform / opacity : léger pour le téléphone.
+   ===================================================================== */
+.ciel > * { translate: calc(var(--tx, 0) * var(--p, 1) * 1px) calc(var(--ty, 0) * var(--p, 1) * 1px); }
+.rayons { --p: .5; } .o1 { --p: 1; } .o2 { --p: 1.6; } .o3 { --p: 2.2; } .etincelles { --p: 2.6; }
+
+.mc-vignette { inset: 0; background: radial-gradient(120% 90% at 50% 40%, transparent 58%, #0000001f 100%); --p: 0; }
+@media (prefers-color-scheme: dark) { .mc-vignette { background: radial-gradient(120% 90% at 50% 40%, transparent 50%, #00000066 100%); } }
+
+/* Halo solaire en haut à droite : il respire, plus fort quand on écrit */
+.mc-soleil {
+  right: -14vmax; top: -14vmax; width: 52vmax; height: 52vmax; border-radius: 50%; --p: .8;
+  background: radial-gradient(circle, #FFE3A866 0%, #F5A6233d 26%, #F5A62312 48%, transparent 66%);
+  opacity: calc(var(--force) * 1.05); transition: opacity .9s ease; will-change: transform;
+  animation: mc-respire 7s ease-in-out infinite alternate;
+}
+@keyframes mc-respire { from { transform: scale(.92); } to { transform: scale(1.14); } }
+
+/* Aurores : deux rubans de couleur qui ondulent lentement (dégradés doux, sans flou coûteux) */
+.mc-aurore { left: -45%; width: 190%; height: 46%; border-radius: 50%; opacity: calc(var(--force) * .85); transition: opacity .9s ease; will-change: transform; }
+.mc-a1 { top: 8%; --p: 1.2; background: radial-gradient(ellipse at center, #45D08A4d 0%, #1FB5A82e 38%, transparent 68%); transform: rotate(-11deg); animation: mc-ruban1 17s ease-in-out infinite alternate; }
+.mc-a2 { bottom: 4%; --p: -1.4; background: radial-gradient(ellipse at center, #F5A62344 0%, #E8890C26 40%, transparent 68%); transform: rotate(9deg); animation: mc-ruban2 21s ease-in-out infinite alternate; }
+@keyframes mc-ruban1 { from { transform: translate3d(-6%, -4%, 0) rotate(-13deg) scaleY(.9); } to { transform: translate3d(8%, 7%, 0) rotate(-6deg) scaleY(1.15); } }
+@keyframes mc-ruban2 { from { transform: translate3d(7%, 5%, 0) rotate(11deg) scaleY(1.1); } to { transform: translate3d(-8%, -6%, 0) rotate(5deg) scaleY(.88); } }
+.layout.quelquun .mc-a2 { animation-duration: 11s; }          /* quelqu'un écrit : tout s'anime plus vite */
+.layout.quelquun .mc-a1 { animation-duration: 12s; }
+
+/* Faisceau : un trait de lumière traverse l'écran de temps en temps */
+.mc-faisceau {
+  top: -30%; left: -50%; width: 42%; height: 160%; --p: 0; opacity: 0; will-change: transform, opacity;
+  background: linear-gradient(90deg, transparent, #FFE3A829 45%, #FFFFFF2e 50%, #FFE3A829 55%, transparent);
+  transform: translateX(0) rotate(16deg);
+  animation: mc-balayage 16s cubic-bezier(.5, 0, .2, 1) 4s infinite;
+}
+@keyframes mc-balayage { 0% { transform: translateX(0) rotate(16deg); opacity: 0; } 8% { opacity: 1; } 36% { opacity: .9; } 46%, 100% { transform: translateX(380%) rotate(16deg); opacity: 0; } }
+
+/* Onde lumineuse depuis le logo à l'arrivée d'un message */
+.mc-onde {
+  left: -94px; top: -100px; width: 260px; height: 260px; border-radius: 50%; --p: 0; opacity: 0; will-change: transform, opacity;
+  background: radial-gradient(circle, transparent 56%, #F5A62399 60%, #45D08A55 64%, transparent 70%);
+}
+.layout.flash .mc-onde { animation: mc-onde 1.25s cubic-bezier(.2, .6, .3, 1); }
+@keyframes mc-onde { from { transform: scale(.15); opacity: 1; } to { transform: scale(2.6); opacity: 0; } }
+
+/* Reflet qui glisse sur l'en-tête */
+.entete::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background: linear-gradient(105deg, transparent 38%, #FFE3A833 50%, transparent 62%) no-repeat;
+  background-size: 260% 100%; background-position: 160% 0; animation: mc-reflet 11s ease-in-out 3s infinite;
+}
+@keyframes mc-reflet { 0% { background-position: 160% 0; } 22%, 100% { background-position: -80% 0; } }
+
+/* Quand on écrit, le bouton d'envoi respire et le champ s'illumine */
+.layout.ecrit .send { animation: mc-souffle 1.7s ease-in-out infinite; }
+@keyframes mc-souffle { 0%, 100% { box-shadow: 0 3px 12px #F5A62355, 0 0 0 0 #F5A62344; } 50% { box-shadow: 0 3px 16px #F5A62399, 0 0 0 7px #F5A62300; } }
+.layout.ecrit .ligne-envoi textarea { border-color: #F5A62399; box-shadow: 0 0 0 4px #F5A6231f, 0 0 22px #45D08A22; }
+
+/* Niveaux choisis dans Réglages */
+.layout.lum-doux .mc-faisceau, .layout.lum-doux .mc-onde, .layout.lum-doux .mc-a2, .layout.lum-doux .entete::before { display: none; }
+.layout.lum-doux .ciel > * { translate: none; }
+.layout.lum-off .ciel { display: none; }
+.layout.lum-off .entete::before { display: none; }
+.layout.lum-off.ecrit .send, .layout.lum-doux.ecrit .send { animation: none; }
+.layout.pause .ciel *, .layout.pause .entete::before, .layout.pause .entete::after { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-soleil, .mc-aurore, .mc-faisceau, .mc-onde, .entete::before, .layout.ecrit .send { animation: none !important; }
+  .mc-faisceau, .mc-onde { display: none; }
+  .ciel > * { translate: none; }
+}
