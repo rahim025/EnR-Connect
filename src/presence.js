@@ -163,6 +163,6 @@ export async function chargerMembres() {
   const snap = await getDocs(collection(ctx.db, 'users'));
   return snap.docs.map(d => {
     const x = d.data();
-    return { uid: d.id, nom: x.name || 'Membre', role: x.role || 'member', vu: x.vu && x.vu.toMillis ? x.vu.toMillis() : 0, enLigne: estEnLigne(d.id) };
+    return { uid: d.id, nom: x.name || 'Membre', role: x.role || 'member', photo: x.photo || '', statut: x.statut || '', vu: x.vu && x.vu.toMillis ? x.vu.toMillis() : 0, enLigne: estEnLigne(d.id) };
   }).sort((a, b) => (b.enLigne - a.enLigne) || (b.vu - a.vu) || a.nom.localeCompare(b.nom, 'fr'));
 }

@@ -1,6 +1,7 @@
 import './update.js';
 import * as P from './presence.js';
 import { lancerVisite } from './visite.js';
+import { reglerTheme, theme as themeActuel, THEMES } from './theme.js';
 import { monterLumiere, reglerNiveau, niveau as niveauLumiere, NIVEAUX as NIVEAUX_LUMIERE } from './lumiere.js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -10,7 +11,7 @@ import {
 } from 'firebase/auth';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, onSnapshot,
-  query, orderBy, limit, where, serverTimestamp, disableNetwork, enableNetwork
+  query, orderBy, limit, where, serverTimestamp, disableNetwork, enableNetwork, updateDoc, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -30,6 +31,7 @@ const state = {
   notifSec: Number(localStorage.getItem('notifSec')) || 60, // rythme de vérification en secondes
   sel: null              // id du message touché (affiche l'heure et « Supprimer »)
 };
+Object.assign(state, { reply: null, edit: null, epingle: null });
 const mediaCache = new Map(); // mediaId -> dataURL
 let unsubs = [];
 let timers = [];
@@ -229,7 +231,18 @@ async function resolveRole(user) {
   }
 }
 
+const T0 = Date.now();
+function cacherSplash() {
+  const sp = document.getElementById('splash'); if (!sp) return;
+  setTimeout(() => { sp.classList.add('fin'); setTimeout(() => sp.remove(), 600); }, Math.max(0, 1100 - (Date.now() - T0)));
+}
+setTimeout(cacherSplash, 7000);
+
 onAuthStateChanged(auth, async user => {
+  try { await gererUtilisateur(user); } finally { cacherSplash(); }
+});
+
+async function gererUtilisateur(user) {
   state.user = user;
   if (!user) { arreterNotifs(); return renderLogin(); }
   if (!user.emailVerified && !estPseudo(user)) return renderLogin('Utilise un compte Google dont l\'adresse est vérifiée.');
@@ -237,13 +250,21 @@ onAuthStateChanged(auth, async user => {
   localStorage.setItem('role:' + mailOf(user), state.role);
   if (state.role === 'refused') return renderRefused();
   startChat();
-});
+}
 
 /* ---------- Icônes ---------- */
 const S = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const F = d => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
 const ICON = {
   retour: S('<path d="M15 5l-7 7 7 7"/>'),
+  recherche: S('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
+  repondre: S('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v3"/>'),
+  epingle: S('<path d="M12 17v5"/><path d="M9 3h6l-1 7 4 4H6l4-4z"/>'),
+  crayon: S('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+  fermer: S('<path d="M18 6L6 18M6 6l12 12"/>'),
+  copier: S('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>'),
+  palette: S('<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>'),
+  info: S('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'),
   soleil: S('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
   chevron: S('<path d="M9 5l7 7-7 7"/>'),
   gear: S('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
@@ -264,9 +285,49 @@ const ICON = {
 const COULEURS = ['#E4572E', '#17A398', '#7B61FF', '#D98A00', '#2E9E6B', '#D6336C', '#3B82F6', '#8D6E63'];
 function couleurDe(s = '') { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return COULEURS[h % COULEURS.length]; }
 const initiales = n => (n || '?').trim().split(/[\s._-]+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '?';
-const avatarHTML = (nom, cle, cache = false) =>
-  `<span class="avatar${cache ? ' cache' : ''}" style="background:${couleurDe(cle || nom)}" aria-hidden="true">${esc(initiales(nom))}</span>`;
+/* Profils : photo et statut, gardés dans le téléphone (chargés à la demande, très peu de données) */
+const profils = new Map();
+try { Object.entries(JSON.parse(localStorage.getItem('profils') || '{}')).forEach(([k, v]) => profils.set(k, v)); } catch { /* ignoré */ }
+const sauverProfils = () => { try { localStorage.setItem('profils', JSON.stringify(Object.fromEntries(profils))); } catch { /* ignoré */ } };
+const dejaDemande = new Set();
+
+const avatarHTML = (nom, cle, cache = false) => {
+  const p = cle && profils.get(cle);
+  const lien = cle ? ` data-prof="${esc(cle)}"` : '';
+  if (p && p.photo) return `<span class="avatar photo-profil${cache ? ' cache' : ''}"${lien} aria-hidden="true"><img src="${p.photo}" alt="" /></span>`;
+  return `<span class="avatar${cache ? ' cache' : ''}"${lien} style="background:${couleurDe(cle || nom)}" aria-hidden="true">${esc(initiales(nom))}</span>`;
+};
+
+// Chaque message porte la version du profil de son auteur (av) : on ne relit son profil que si elle a changé.
+function verifierProfils(ms) {
+  const dernier = new Map();
+  ms.forEach(m => { if (m.uid && m.uid !== state.user.uid) dernier.set(m.uid, m.av || 0); });
+  dernier.forEach((av, uid) => {
+    if (!av) return;
+    const p = profils.get(uid);
+    if (p && (p.pv || 0) >= av) return;
+    const cle = uid + ':' + av;
+    if (dejaDemande.has(cle)) return;
+    dejaDemande.add(cle);
+    getDoc(doc(db, 'users', uid)).then(snap => {
+      const d = snap.exists() ? snap.data() : {};
+      profils.set(uid, { photo: d.photo || '', statut: d.statut || '', pv: Math.max(av, d.pv || 0) });
+      sauverProfils(); renderFeed();
+    }).catch(() => {});
+  });
+}
 const dateDe = m => (m.createdAt && m.createdAt.toDate ? m.createdAt.toDate() : new Date());
+
+const heureCourte = d => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+function libelleJour(d) {
+  const now = new Date(); const hier = new Date(now); hier.setDate(now.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) return "Aujourd'hui";
+  if (d.toDateString() === hier.toDateString()) return 'Hier';
+  const o = { weekday: 'long', day: 'numeric', month: 'long' };
+  if (d.getFullYear() !== now.getFullYear()) o.year = 'numeric';
+  const t = d.toLocaleDateString('fr-FR', o);
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
 
 function etiquette(d) {
   const now = new Date();
@@ -279,7 +340,7 @@ function etiquette(d) {
 }
 
 /* ---------- Petits composants : message de confirmation et notification ---------- */
-function confirmer(titre, texte, bouton) {
+function confirmer(titre, texte, bouton, annuler = 'Annuler', neutre = false) {
   return new Promise(resolve => {
     const o = document.createElement('div');
     o.className = 'voile';
@@ -287,11 +348,11 @@ function confirmer(titre, texte, bouton) {
       <div class="dialogue" role="alertdialog" aria-modal="true">
         <h3>${esc(titre)}</h3>
         <p>${esc(texte)}</p>
-        <div class="boutons"><button type="button" class="annuler">Annuler</button><button type="button" class="valider">${esc(bouton)}</button></div>
+        <div class="boutons">${annuler === null ? '' : `<button type="button" class="annuler">${esc(annuler)}</button>`}<button type="button" class="valider${neutre ? ' neutre' : ''}">${esc(bouton)}</button></div>
       </div>`;
     document.body.appendChild(o);
     const fin = v => { o.remove(); resolve(v); };
-    o.querySelector('.annuler').onclick = () => fin(false);
+    const an = o.querySelector('.annuler'); if (an) an.onclick = () => fin(false);
     o.querySelector('.valider').onclick = () => fin(true);
     o.onclick = e => { if (e.target === o) fin(false); };
   });
@@ -346,9 +407,11 @@ function subscribeMessages() {
 function startChat() {
   stopAll();
   state.limit = PAGE;
-  state.sel = null;
+  state.sel = null; state.reply = null; state.edit = null;
   renderShell();
   subscribeMessages();
+  chargerEpingle();
+  chargerMonProfil();
   demarrerNotifs();
   setTimeout(() => lancerVisite({ uid: state.user.uid, admin: state.role === 'admin' }), 700);
   P.demarrer({ db, uid: state.user.uid, nom: nomAffiche(state.user), role: state.role, onChange: majPresenceUI });
@@ -387,13 +450,16 @@ function renderShell() {
           </div>
         </div>
         <div class="actions-entete">
+          <button class="icone" id="btn-search" aria-label="Rechercher dans les messages">${ICON.recherche}</button>
           ${admin ? `<button class="icone" id="btn-admin" aria-label="Administration">${ICON.shield}</button>` : ''}
           <button class="icone" id="btn-set" aria-label="Infos du groupe et réglages">${ICON.gear}</button>
         </div>
       </header>
+      <div class="epingle" id="epingle" hidden></div>
       <section class="fil" id="fil" aria-live="polite"></section>
       <div class="frappe" id="frappe" hidden aria-live="polite"><span class="eclairs"><i></i><i></i><i></i></span><span id="frappe-txt"></span></div>
       <form class="envoi" id="form">
+        <div class="bandeau-contexte" id="contexte" hidden></div>
         <div class="bandeau-annonce" id="bandeau" hidden>${ICON.megaphone}<span>Ce message sera publié comme annonce</span></div>
         <div class="ligne-envoi">
           <button type="button" class="icone accent" id="btn-photo" aria-label="Envoyer une photo">${ICON.camera}</button>
@@ -423,6 +489,7 @@ function renderShell() {
   document.getElementById('btn-photo').onclick = () => document.getElementById('file').click();
   document.getElementById('file').onchange = onPickPhoto;
   document.getElementById('btn-set').onclick = () => openPanel('settings');
+  document.getElementById('btn-search').onclick = () => openPanel('search');
   const ba = document.getElementById('btn-admin'); if (ba) ba.onclick = () => openPanel('admin');
   const bn = document.getElementById('btn-annonce');
   if (bn) bn.onclick = () => { state.announce = !state.announce; majAnnonce(); };
@@ -496,17 +563,44 @@ function contenuHTML(m) {
     if (mediaCache.has(m.mediaId)) return `<img src="${mediaCache.get(m.mediaId)}" alt="Photo envoyée par ${esc(m.name)}" />`;
     return `<button class="media-masque" data-media="${esc(m.mediaId)}">${ICON.image}<span><strong>Photo masquée</strong><small>${m.taille ? m.taille + ' Ko · ' : ''}Appuie pour charger</small></span></button>`;
   }
-  return `<div class="texte">${lierURL(esc(m.text)).replace(/\n/g, '<br>')}</div>`;
+  return `<div class="texte">${lierURL(esc(m.text)).replace(/\n/g, '<br>')}${m.editedAt ? '<span class="modifie">modifié</span>' : ''}</div>`;
+}
+
+const REACTIONS = [['coeur', '❤️'], ['pouce', '👍'], ['rire', '😂'], ['wow', '😮'], ['triste', '😢'], ['merci', '🙏']];
+const trouver = id => state.messages.find(m => m.id === id);
+const extrait = (m, n = 90) => m.kind === 'image' ? '📷 Photo' : String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, n);
+const monAv = () => (profils.get(state.user.uid) || {}).pv || 0;
+
+const citationHTML = m => m.reply
+  ? `<button type="button" class="citation" data-goto="${esc(m.reply.id)}"><strong>${esc(m.reply.name)}</strong><span>${esc(m.reply.extrait)}</span></button>` : '';
+
+function reacsHTML(m) {
+  const r = m.reactions || {};
+  const chips = REACTIONS.filter(([k]) => (r[k] || []).length).map(([k, e]) => {
+    const n = r[k].length; const moi = r[k].includes(state.user.uid);
+    return `<button type="button" class="reac${moi ? ' moi' : ''}" data-react="${k}" data-id="${m.id}" aria-label="${e} ${n}">${e}<b>${n}</b></button>`;
+  });
+  return chips.length ? `<div class="reacs">${chips.join('')}</div>` : '';
 }
 
 function detailHTML(m, moi) {
   const sel = state.sel === m.id;
   if (!m.pending && !sel) return '';
-  const peutSuppr = state.role === 'admin' || moi;
-  return `<div class="detail">
-    ${m.pending ? `<span class="attente">${ICON.clock}En attente d'envoi</span>` : ''}
-    ${sel ? `<span>${esc(etiquette(dateDe(m)))}</span>${peutSuppr ? `<button class="suppr" data-del="${m.id}">Supprimer</button>` : ''}` : ''}
-  </div>`;
+  const admin = state.role === 'admin';
+  let h = m.pending ? `<div class="detail"><span class="attente">${ICON.clock}En attente d'envoi</span></div>` : '';
+  if (sel && !m.pending) {
+    const r = m.reactions || {};
+    h += `<div class="choix-reac" role="group" aria-label="Réagir">${REACTIONS.map(([k, e]) =>
+      `<button type="button" class="${(r[k] || []).includes(state.user.uid) ? 'actif' : ''}" data-react="${k}" data-id="${m.id}" aria-label="Réagir ${e}">${e}</button>`).join('')}</div>`;
+    h += `<div class="detail actions-msg"><span>${esc(etiquette(dateDe(m)))}</span>
+      <button type="button" data-reply="${m.id}">${ICON.repondre}Répondre</button>
+      ${m.kind !== 'image' ? `<button type="button" data-copy="${m.id}">${ICON.copier}Copier</button>` : ''}
+      ${moi && m.kind === 'text' && m.text !== '👍' ? `<button type="button" data-edit="${m.id}">${ICON.crayon}Modifier</button>` : ''}
+      ${admin && m.kind !== 'image' ? `<button type="button" data-pin="${m.id}">${ICON.epingle}Épingler</button>` : ''}
+      ${(admin || moi) ? `<button type="button" class="suppr" data-del="${m.id}">Supprimer</button>` : ''}
+    </div>`;
+  }
+  return h;
 }
 
 function ligneHTML(x, debut, fin) {
@@ -516,21 +610,24 @@ function ligneHTML(x, debut, fin) {
       <div class="rang annonce-rang">
         <div class="colonne">
           <article class="bulle annonce" data-id="${m.id}">
-            <div class="qui">${ICON.megaphone}<span>Annonce de ${esc(m.name)}</span></div>
-            ${contenuHTML(m)}
+            <div class="qui" data-prof="${esc(m.uid)}">${ICON.megaphone}<span>Annonce de ${esc(m.name)}</span></div>
+            ${citationHTML(m)}${contenuHTML(m)}
           </article>
-          ${detailHTML(m, moi)}
+          ${reacsHTML(m)}${detailHTML(m, moi)}
         </div>
       </div>`;
   }
   const pos = debut && fin ? 'seul' : debut ? 'debut' : fin ? 'fin' : 'milieu';
   const photo = m.kind === 'image' && mediaCache.has(m.mediaId) ? ' photo' : '';
+  const image = m.kind === 'image';
   return `
     <div class="rang ${moi ? 'moi' : 'autre'}${debut ? ' nouveau' : ''}">
       ${moi ? '' : avatarHTML(m.name, m.uid, !fin)}
       <div class="colonne">
-        ${!moi && debut ? `<div class="qui">${esc(m.name)}</div>` : ''}
-        <article class="bulle ${moi ? 'moi' : 'autre'} ${pos}${photo}" data-id="${m.id}">${contenuHTML(m)}</article>
+        ${!moi && debut ? `<div class="qui" data-prof="${esc(m.uid)}">${esc(m.name)}</div>` : ''}
+        ${image ? citationHTML(m) : ''}
+        <article class="bulle ${moi ? 'moi' : 'autre'} ${pos}${photo}" data-id="${m.id}">${image ? '' : citationHTML(m)}${contenuHTML(m)}</article>
+        ${reacsHTML(m)}
         ${detailHTML(m, moi)}
       </div>
     </div>`;
@@ -543,9 +640,10 @@ function renderFeed() {
 
   const infos = ms.map((m, i) => {
     const d = dateDe(m); const p = ms[i - 1]; const pd = p && dateDe(p);
-    const temps = !p || d - pd >= 20 * 60000 || d.toDateString() !== pd.toDateString();
+    const jour = !p || d.toDateString() !== pd.toDateString();
+    const temps = !p || d - pd >= 20 * 60000 || jour;
     const rompt = temps || m.uid !== p.uid || m.kind === 'announce' || p.kind === 'announce';
-    return { m, d, temps, rompt };
+    return { m, d, jour, temps, rompt };
   });
 
   const plus = ms.length >= state.limit
@@ -554,7 +652,9 @@ function renderFeed() {
   fil.innerHTML = ms.length
     ? plus + infos.map((x, i) => {
         const suiv = infos[i + 1];
-        return (x.temps ? `<div class="temps">${esc(etiquette(x.d))}</div>` : '') + ligneHTML(x, x.rompt, !suiv || suiv.rompt);
+        return (x.jour ? `<div class="jour"><span>${esc(libelleJour(x.d))}</span></div>` : '')
+          + (x.temps ? `<div class="temps">${esc(heureCourte(x.d))}</div>` : '')
+          + ligneHTML(x, x.rompt, !suiv || suiv.rompt);
       }).join('')
     : `<div class="vide"><span class="logo grand"></span><strong>Aucun message pour l'instant</strong><span>Écris le premier.</span></div>`;
 
@@ -569,6 +669,7 @@ function renderFeed() {
     }
     state.dernierId = dernier.id; state.dernierT = t;
   }
+  verifierProfils(ms);
   // Mode normal : charger automatiquement les photos
   if (!state.eco) ms.filter(m => m.kind === 'image' && !mediaCache.has(m.mediaId)).forEach(m => loadMedia(m.mediaId));
 }
@@ -586,24 +687,227 @@ async function loadMedia(id) {
 async function onFeedClick(e) {
   if (e.target.closest('a')) return; // un lien s'ouvre sans sélectionner la bulle
   const t = e.target.closest('button');
-  if (t) {
-    if (t.dataset.plus) { t.textContent = 'Chargement…'; state.limit += PAGE; subscribeMessages(); return; }
-    if (t.dataset.media) { t.querySelector('strong').textContent = 'Chargement…'; loadMedia(t.dataset.media); return; }
-    if (t.dataset.del) {
-      const ok = await confirmer('Supprimer ce message ?', 'Il sera supprimé pour tout le monde dans le groupe.', 'Supprimer');
-      if (ok) { state.sel = null; deleteDoc(doc(db, 'messages', t.dataset.del)).catch(() => toast('Suppression impossible.')); }
-    }
+  if (!t) {
+    const prof = e.target.closest('[data-prof]');
+    if (prof) { ouvrirFiche(prof.dataset.prof); return; }
+    const bulle = e.target.closest('.bulle');
+    if (bulle) { state.sel = state.sel === bulle.dataset.id ? null : bulle.dataset.id; renderFeed(); }
     return;
   }
-  const bulle = e.target.closest('.bulle');
-  if (bulle) { state.sel = state.sel === bulle.dataset.id ? null : bulle.dataset.id; renderFeed(); }
+  const d = t.dataset;
+  if (d.plus) { t.textContent = 'Chargement…'; state.limit += PAGE; subscribeMessages(); return; }
+  if (d.media) { t.querySelector('strong').textContent = 'Chargement…'; loadMedia(d.media); return; }
+  if (d.del) {
+    const ok = await confirmer('Supprimer ce message ?', 'Il sera supprimé pour tout le monde dans le groupe.', 'Supprimer');
+    if (ok) { state.sel = null; deleteDoc(doc(db, 'messages', d.del)).catch(() => toast('Suppression impossible.')); }
+    return;
+  }
+  if (d.react) { reagir(d.id, d.react); return; }
+  if (d.reply) { demarrerReponse(d.reply); return; }
+  if (d.copy) { copierMessage(d.copy); return; }
+  if (d.edit) { demarrerEdition(d.edit); return; }
+  if (d.pin) { epingler(d.pin); return; }
+  if (d.goto) allerAuMessage(d.goto);
+}
+
+/* ---------- Réponses, réactions, modification, épinglage ---------- */
+function reagir(id, cle) {
+  const m = trouver(id); if (!m || m.pending) return;
+  const deja = ((m.reactions || {})[cle] || []).includes(state.user.uid);
+  state.sel = null;
+  updateDoc(doc(db, 'messages', id), { ['reactions.' + cle]: deja ? arrayRemove(state.user.uid) : arrayUnion(state.user.uid) })
+    .catch(() => toast('Réaction impossible pour l\'instant.'));
+  renderFeed();
+}
+
+function majContexte() {
+  const c = document.getElementById('contexte'); if (!c) return;
+  const x = state.edit ? { ic: ICON.crayon, titre: 'Modification du message', txt: state.edit.extrait }
+    : state.reply ? { ic: ICON.repondre, titre: 'Réponse à ' + state.reply.name, txt: state.reply.extrait } : null;
+  if (!x) { c.hidden = true; c.innerHTML = ''; return; }
+  c.hidden = false;
+  c.innerHTML = `${x.ic}<div class="ctx-txt"><strong>${esc(x.titre)}</strong><span>${esc(x.txt)}</span></div><button type="button" class="icone" id="ctx-fermer" aria-label="Annuler">${ICON.fermer}</button>`;
+  c.querySelector('#ctx-fermer').onclick = () => annulerContexte(true);
+}
+
+function annulerContexte(viderChamp = false) {
+  const etaitEdition = !!state.edit;
+  state.reply = null; state.edit = null; majContexte();
+  if (viderChamp && etaitEdition) {
+    const b = document.getElementById('texte');
+    if (b) { b.value = ''; b.style.height = ''; majBoutonEnvoi(); const lay = document.querySelector('.layout'); if (lay) lay.classList.remove('ecrit'); }
+  }
+}
+
+function demarrerReponse(id) {
+  const m = trouver(id); if (!m) return;
+  state.edit = null; state.sel = null;
+  state.reply = { id: m.id, name: m.name, extrait: extrait(m, 80) };
+  majContexte(); renderFeed();
+  const b = document.getElementById('texte'); if (b) b.focus();
+}
+
+function demarrerEdition(id) {
+  const m = trouver(id); if (!m || m.uid !== state.user.uid || m.kind !== 'text') return;
+  state.reply = null; state.sel = null;
+  state.edit = { id: m.id, extrait: extrait(m, 80) };
+  const b = document.getElementById('texte');
+  if (b) { b.value = m.text; b.dispatchEvent(new Event('input')); b.focus(); }
+  majContexte(); renderFeed();
+}
+
+async function copierMessage(id) {
+  const m = trouver(id); state.sel = null; renderFeed();
+  if (!m) return;
+  try { await navigator.clipboard.writeText(m.text || ''); toast('Message copié'); } catch { toast('Copie impossible.'); }
+}
+
+function allerAuMessage(id) {
+  const b = document.querySelector(`#fil [data-id="${CSS.escape(id)}"]`);
+  if (!b) { toast('Ce message est plus ancien : charge les messages précédents.'); return; }
+  b.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  b.classList.remove('surligne'); void b.offsetWidth; b.classList.add('surligne');
+  setTimeout(() => b.classList.remove('surligne'), 2000);
+}
+
+/* Message épinglé (administrateurs) : un seul document, relu au lancement et au retour dans l'appli */
+async function epingler(id) {
+  const m = trouver(id); if (!m || state.role !== 'admin') return;
+  state.sel = null;
+  const data = { id: m.id, name: m.name, text: extrait(m, 400), by: nomAffiche(state.user) };
+  try {
+    await setDoc(doc(db, 'meta', 'epingle'), { ...data, at: serverTimestamp() });
+    state.epingle = data; majEpingle(); renderFeed(); toast('Message épinglé');
+  } catch { toast('Épinglage impossible pour l\'instant.'); }
+}
+
+function majEpingle() {
+  const b = document.getElementById('epingle'); if (!b) return;
+  const e = state.epingle;
+  if (!e) { b.hidden = true; b.innerHTML = ''; return; }
+  b.hidden = false;
+  b.innerHTML = `<button type="button" class="ep-corps" id="ep-ouvrir">${ICON.epingle}<span class="ep-txt"><strong>Message épinglé · ${esc(e.name)}</strong><span>${esc(e.text)}</span></span></button>`
+    + (state.role === 'admin' ? `<button type="button" class="icone" id="ep-retirer" aria-label="Retirer le message épinglé">${ICON.fermer}</button>` : '');
+  b.querySelector('#ep-ouvrir').onclick = async () => {
+    const present = !!trouver(e.id);
+    const ok = await confirmer('Message épinglé · ' + e.name, e.text, present ? 'Voir le message' : 'Fermer', present ? 'Fermer' : null, true);
+    if (ok && present) allerAuMessage(e.id);
+  };
+  const r = b.querySelector('#ep-retirer');
+  if (r) r.onclick = async () => {
+    if (!(await confirmer('Retirer le message épinglé ?', 'Il ne sera plus affiché en haut pour les membres.', 'Retirer'))) return;
+    try { await deleteDoc(doc(db, 'meta', 'epingle')); state.epingle = null; majEpingle(); } catch { toast('Impossible pour l\'instant.'); }
+  };
+}
+
+async function chargerEpingle() {
+  try { const sn = await getDoc(doc(db, 'meta', 'epingle')); state.epingle = sn.exists() ? sn.data() : null; } catch { /* hors ligne ou règles pas encore publiées */ }
+  majEpingle();
+}
+let derniereEpingle = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !state.user || !state.role) return;
+  if (Date.now() - derniereEpingle < 3 * 60 * 1000) return;
+  derniereEpingle = Date.now(); chargerEpingle();
+});
+
+/* Profil : photo ronde + statut */
+async function chargerMonProfil() {
+  try {
+    const sn = await getDoc(doc(db, 'users', state.user.uid)); const d = sn.exists() ? sn.data() : {};
+    profils.set(state.user.uid, { photo: d.photo || '', statut: d.statut || '', pv: d.pv || 0 }); sauverProfils();
+  } catch { /* on garde la copie du téléphone */ }
+}
+
+function compressCarre(file, taille = 160, qualite = 0.72) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = taille;
+      const cote = Math.min(img.width, img.height);
+      c.getContext('2d').drawImage(img, (img.width - cote) / 2, (img.height - cote) / 2, cote, cote, 0, 0, taille, taille);
+      URL.revokeObjectURL(url); resolve(c.toDataURL('image/jpeg', qualite));
+    };
+    img.onerror = reject; img.src = url;
+  });
+}
+
+async function ouvrirFiche(uid) {
+  const moi = uid === state.user.uid;
+  const o = document.createElement('div'); o.className = 'voile'; document.body.appendChild(o);
+  const msg = state.messages.find(m => m.uid === uid);
+  let d = { name: (msg && msg.name) || (moi ? nomAffiche(state.user) : 'Membre'), role: moi ? state.role : '', vu: 0 };
+  const rendre = () => {
+    const p = profils.get(uid) || {};
+    const enLigne = moi || P.estEnLigne(uid);
+    o.innerHTML = `
+      <div class="dialogue fiche" role="dialog" aria-modal="true" aria-label="Profil de ${esc(d.name)}">
+        ${avatarHTML(d.name, uid).replace('class="avatar', 'class="avatar enorme').replace(/ data-prof="[^"]*"/, '')}
+        <h3>${esc(d.name)}</h3>
+        <div class="badges">${d.role === 'admin' ? '<span class="badge">Admin</span>' : ''}${enLigne ? '<span class="badge en-ligne">En ligne</span>' : ''}${moi ? '<span class="badge">Toi</span>' : ''}</div>
+        <p class="statut-fiche">${p.statut ? esc(p.statut) : '<em>Pas de statut</em>'}</p>
+        ${!enLigne && d.vu ? `<p class="vu-fiche">Vu ${esc(etiquette(new Date(d.vu))).toLowerCase()}</p>` : ''}
+        <div class="boutons"><button type="button" class="annuler">Fermer</button>${moi ? '<button type="button" class="valider neutre" id="edit-profil">Modifier mon profil</button>' : ''}</div>
+      </div>`;
+    o.querySelector('.annuler').onclick = () => o.remove();
+    const ep = o.querySelector('#edit-profil'); if (ep) ep.onclick = () => { o.remove(); modifierProfil(); };
+  };
+  o.onclick = e => { if (e.target === o) o.remove(); };
+  rendre();
+  try {
+    const sn = await getDoc(doc(db, 'users', uid));
+    if (sn.exists()) {
+      const x = sn.data();
+      d = { name: x.name || d.name, role: x.role || d.role, vu: x.vu && x.vu.toMillis ? x.vu.toMillis() : 0 };
+      const p0 = profils.get(uid) || {};
+      profils.set(uid, { photo: x.photo || '', statut: x.statut || '', pv: Math.max(x.pv || 0, p0.pv || 0) }); sauverProfils();
+      if (document.body.contains(o)) rendre();
+      renderFeed();
+    }
+  } catch { /* hors ligne : on garde ce qu'on a */ }
+}
+
+function modifierProfil() {
+  const uid = state.user.uid; const nom = nomAffiche(state.user);
+  const p0 = profils.get(uid) || {};
+  let photo = p0.photo || ''; let statut = p0.statut || '';
+  const o = document.createElement('div'); o.className = 'voile'; document.body.appendChild(o);
+  const rendre = () => {
+    const grand = photo
+      ? `<span class="avatar enorme photo-profil"><img src="${photo}" alt="" /></span>`
+      : avatarHTML(nom, uid).replace('class="avatar', 'class="avatar enorme').replace(/ data-prof="[^"]*"/, '');
+    o.innerHTML = `
+      <div class="dialogue fiche" role="dialog" aria-modal="true" aria-label="Modifier mon profil">
+        ${grand}
+        <div class="ligne-boutons"><button type="button" class="petit" id="p-photo">${photo ? 'Changer la photo' : 'Ajouter une photo'}</button>${photo ? '<button type="button" class="petit danger" id="p-retirer">Retirer</button>' : ''}</div>
+        <label class="champ-profil"><span>Statut</span><input id="p-statut" type="text" maxlength="80" placeholder="Ex. : en stage cette semaine" value="${esc(statut)}" /></label>
+        <input id="p-fichier" type="file" accept="image/*" hidden />
+        <div class="boutons"><button type="button" class="annuler" id="p-annuler">Annuler</button><button type="button" class="valider neutre" id="p-ok">Enregistrer</button></div>
+      </div>`;
+    const champ = o.querySelector('#p-statut'); champ.oninput = () => { statut = champ.value; };
+    o.querySelector('#p-photo').onclick = () => o.querySelector('#p-fichier').click();
+    o.querySelector('#p-fichier').onchange = async ev => {
+      const f = ev.target.files[0]; if (!f) return;
+      try { photo = await compressCarre(f); rendre(); } catch { toast('Impossible de préparer cette photo.'); }
+    };
+    const rt = o.querySelector('#p-retirer'); if (rt) rt.onclick = () => { photo = ''; rendre(); };
+    o.querySelector('#p-annuler').onclick = () => o.remove();
+    o.querySelector('#p-ok').onclick = () => {
+      const st = statut.trim().slice(0, 80); const pv = Date.now();
+      profils.set(uid, { photo, statut: st, pv }); sauverProfils();
+      setDoc(doc(db, 'users', uid), { photo, statut: st, pv }, { merge: true }).catch(() => toast('Profil enregistré sur ce téléphone, pas encore partagé.'));
+      o.remove(); toast('Profil enregistré ✓'); renderFeed();
+      const pn = document.getElementById('panneau'); if (pn && state.panel === 'settings') renderSettings(pn);
+    };
+  };
+  o.onclick = e => { if (e.target === o) o.remove(); };
+  rendre();
 }
 
 function envoyerMessage(text, kind = 'text') {
-  addDoc(collection(db, 'messages'), {
-    uid: state.user.uid, name: nomAffiche(state.user),
-    kind, text, createdAt: serverTimestamp()
-  }).catch(console.error); // pas de await : hors ligne, le message reste en attente
+  const data = { uid: state.user.uid, name: nomAffiche(state.user), kind, text, av: monAv(), createdAt: serverTimestamp() };
+  if (state.reply) { data.reply = { id: state.reply.id, name: state.reply.name, extrait: state.reply.extrait }; state.reply = null; majContexte(); }
+  addDoc(collection(db, 'messages'), data).catch(console.error); // pas de await : hors ligne, le message reste en attente
 }
 
 function envoyer() {
@@ -611,6 +915,13 @@ function envoyer() {
   const text = box.value.trim();
   eclat('eclat', '#btn-send', 700);
   P.finSaisie();
+  if (state.edit) {
+    if (!text) return;
+    const m = trouver(state.edit.id);
+    if (m && text !== m.text) updateDoc(doc(db, 'messages', m.id), { text, editedAt: serverTimestamp() }).catch(() => toast('Modification impossible.'));
+    annulerContexte(true);
+    return;
+  }
   if (!text) { envoyerMessage('👍'); return; } // zone vide : le bouton envoie un « J'aime »
   envoyerMessage(text, state.announce && state.role === 'admin' ? 'announce' : 'text');
   box.value = ''; box.style.height = '';
@@ -647,7 +958,7 @@ async function onPickPhoto(e) {
     mediaCache.set(mref.id, data);
     setDoc(mref, { uid: state.user.uid, data, createdAt: serverTimestamp() }).catch(console.error);
     addDoc(collection(db, 'messages'), {
-      uid: state.user.uid, name: nomAffiche(state.user), kind: 'image', mediaId: mref.id, taille, createdAt: serverTimestamp()
+      uid: state.user.uid, name: nomAffiche(state.user), kind: 'image', mediaId: mref.id, taille, av: monAv(), createdAt: serverTimestamp()
     }).catch(console.error);
   } catch (err) {
     toast('Impossible de préparer cette photo.');
@@ -661,7 +972,10 @@ function openPanel(which) {
   p.className = 'panneau'; p.id = 'panneau';
   document.body.appendChild(p);
   state.panel = which;
-  if (which === 'settings') renderSettings(p); else renderAdmin(p);
+  if (which === 'settings') renderSettings(p);
+  else if (which === 'search') renderRecherche(p);
+  else if (which === 'about') renderAbout(p);
+  else renderAdmin(p);
 }
 
 function closePanel() {
@@ -685,6 +999,13 @@ function renderSettings(p) {
         <p>Groupe de discussion de la classe d'énergies renouvelables</p>
       </div>
 
+      <h3 class="titre-section">Mon profil</h3>
+      <button class="rangee" id="mon-profil">
+        ${avatarHTML(nomAffiche(state.user), state.user.uid).replace('class="avatar', 'class="avatar gros').replace(/ data-prof="[^"]*"/, '')}
+        <span class="libelle"><strong>${esc(nomAffiche(state.user))}</strong><small>${esc((profils.get(state.user.uid) || {}).statut || 'Ajouter une photo et un statut')}</small></span>
+        <span class="fleche">${ICON.chevron}</span>
+      </button>
+
       <h3 class="titre-section">Discussion</h3>
       <label class="rangee">
         <span class="pastille">${ICON.leaf}</span>
@@ -697,6 +1018,14 @@ function renderSettings(p) {
         <span class="libelle"><strong>Effets de lumière</strong><small>Aurores, halo solaire, faisceau et ondes. Choisis « Doux » ou « Éteint » pour économiser la batterie.</small></span>
         <select class="choix" id="lumiere" aria-label="Effets de lumière">
           ${NIVEAUX_LUMIERE.map(([v, t]) => `<option value="${v}" ${niveauLumiere() === v ? 'selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="rangee statique">
+        <span class="pastille">${ICON.palette}</span>
+        <span class="libelle"><strong>Thème</strong><small>Automatique suit le réglage de ton téléphone.</small></span>
+        <select class="choix" id="theme" aria-label="Thème">
+          ${THEMES.map(([v, t]) => `<option value="${v}" ${themeActuel() === v ? 'selected' : ''}>${t}</option>`).join('')}
         </select>
       </div>
 
@@ -726,6 +1055,11 @@ function renderSettings(p) {
       </button>` : ''}
 
       <h3 class="titre-section">Aide</h3>
+      <button class="rangee" id="a-propos">
+        <span class="pastille">${ICON.info}</span>
+        <span class="libelle"><strong>À propos et règles du groupe</strong><small>Version de l'appli et bonnes pratiques</small></span>
+        <span class="fleche">${ICON.chevron}</span>
+      </button>
       <button class="rangee" id="revoir-visite">
         <span class="pastille">${ICON.megaphone}</span>
         <span class="libelle"><strong>Revoir la visite guidée</strong><small>Explique chaque partie de l'écran et son rôle</small></span>
@@ -757,14 +1091,74 @@ function renderSettings(p) {
     state.notifSec = Number(e.target.value); localStorage.setItem('notifSec', String(state.notifSec));
     if (state.notif) demarrerNotifs();
   };
+  p.querySelector('#theme').onchange = ev => reglerTheme(ev.target.value);
+  p.querySelector('#mon-profil').onclick = () => modifierProfil();
+  p.querySelector('#a-propos').onclick = () => openPanel('about');
   p.querySelector('#revoir-visite').onclick = () => { closePanel(); setTimeout(() => lancerVisite({ uid: state.user.uid, admin, force: true }), 350); };
   p.querySelector('#logout').onclick = () => { closePanel(); arreterNotifs(); P.arreter(); signOut(auth); };
+}
+
+function surligner(txt = '', t) {
+  const i = txt.toLowerCase().indexOf(t);
+  if (i < 0) return esc(txt.slice(0, 120));
+  const a = Math.max(0, i - 30);
+  return `${a > 0 ? '…' : ''}${esc(txt.slice(a, i))}<mark>${esc(txt.slice(i, i + t.length))}</mark>${esc(txt.slice(i + t.length, i + t.length + 90))}`;
+}
+
+function renderRecherche(p) {
+  p.innerHTML = `
+    <header class="entete-panneau"><button class="icone" id="close" aria-label="Retour">${ICON.retour}</button>
+      <input id="q" class="champ-recherche" type="search" placeholder="Rechercher un mot ou un nom" autocomplete="off" aria-label="Rechercher dans les messages" /></header>
+    <div class="corps" id="resultats"></div>`;
+  const q = p.querySelector('#q'); const z = p.querySelector('#resultats');
+  const afficher = () => {
+    const t = q.value.trim().toLowerCase();
+    if (t.length < 2) { z.innerHTML = `<p class="note">Tape au moins 2 lettres. La recherche porte sur les ${state.messages.length} derniers messages chargés. Pour remonter plus loin, utilise « Voir les messages précédents » dans la discussion.</p>`; return; }
+    const res = state.messages.filter(m => (m.kind !== 'image' && String(m.text || '').toLowerCase().includes(t)) || String(m.name || '').toLowerCase().includes(t)).reverse().slice(0, 60);
+    z.innerHTML = res.length
+      ? res.map(m => `<button type="button" class="resultat" data-go="${esc(m.id)}"><span class="r-haut"><strong>${esc(m.name)}</strong><small>${esc(etiquette(dateDe(m)))}</small></span><span class="r-texte">${m.kind === 'image' ? '📷 Photo' : surligner(m.text, t)}</span></button>`).join('')
+      : '<p class="note">Aucun message trouvé.</p>';
+  };
+  q.oninput = afficher; afficher();
+  z.onclick = e => { const b = e.target.closest('[data-go]'); if (!b) return; const id = b.dataset.go; closePanel(); setTimeout(() => allerAuMessage(id), 200); };
+  p.querySelector('#close').onclick = closePanel;
+  setTimeout(() => q.focus(), 150);
+}
+
+function renderAbout(p) {
+  const build = import.meta.env.VITE_BUILD;
+  p.innerHTML = `
+    ${enteteHTML('À propos et règles')}
+    <div class="corps">
+      <div class="hero">
+        <span class="avatar-groupe grand"><span class="logo grand"></span></span>
+        <h1>EnR Connect</h1>
+        <p>Le groupe de discussion de la classe d'énergies renouvelables : simple, léger et pensé pour consommer très peu de données.</p>
+      </div>
+      <p class="version">Version ${build ? esc(String(build)) : 'de développement'}</p>
+      <h3 class="titre-section">Règles du groupe</h3>
+      <ol class="regles">
+        <li>Respecte tes camarades : pas d'insultes, de moqueries ni de harcèlement.</li>
+        <li>Reste dans le sujet de la classe : cours, devoirs, projets et informations pratiques.</li>
+        <li>Pas de spam, de chaînes de messages ni de publicité.</li>
+        <li>Ne partage jamais les informations privées ou les photos d'une personne sans son accord.</li>
+        <li>Les annonces des administrateurs sont officielles : lis-les avant de poser une question.</li>
+        <li>Un problème ou un abus ? Préviens un administrateur.</li>
+      </ol>
+      <h3 class="titre-section">Bon à savoir</h3>
+      <p class="note">Appuie sur un message pour réagir, répondre, copier, modifier ou supprimer le tien. Les photos sont réduites automatiquement. En mode économique, elles restent masquées jusqu'à ce que tu appuies dessus.</p>
+    </div>`;
+  p.querySelector('#close').onclick = closePanel;
 }
 
 /* Membres du groupe (réglages) */
 let listeMembres = [];
 async function chargerListeMembres() {
-  try { listeMembres = await P.chargerMembres(); } catch (e) { listeMembres = null; }
+  try {
+    listeMembres = await P.chargerMembres();
+    listeMembres.forEach(m => { profils.set(m.uid, { photo: m.photo || '', statut: m.statut || '', pv: (profils.get(m.uid) || {}).pv || 0 }); });
+    sauverProfils();
+  } catch (e) { listeMembres = null; }
   remplirMembres();
 }
 function remplirMembres() {
@@ -773,12 +1167,13 @@ function remplirMembres() {
   const moi = state.user.uid;
   const liste = listeMembres.map(m => ({ ...m, enLigne: P.estEnLigne(m.uid) }))
     .sort((a, b) => (b.enLigne - a.enLigne) || (b.vu - a.vu) || a.nom.localeCompare(b.nom, 'fr'));
+  zone.onclick = e => { const r = e.target.closest('[data-membre]'); if (r) ouvrirFiche(r.dataset.membre); };
   const nb = document.getElementById('nb-membres');
   if (nb) nb.textContent = `(${liste.length} · ${liste.filter(m => m.enLigne).length} en ligne)`;
   zone.innerHTML = liste.map((m, i) => `
-    <div class="rangee statique membre ${m.enLigne ? 'on' : ''}" style="--i:${Math.min(i, 12)}">
-      <span class="avatar-pres">${avatarHTML(m.nom, m.uid).replace('class="avatar', 'class="avatar gros')}<i class="pastille-pres"></i></span>
-      <span class="libelle"><strong>${esc(m.nom)}</strong><small>${m.enLigne ? 'En ligne maintenant' : (m.vu ? 'Vu ' + esc(etiquette(new Date(m.vu))).toLowerCase() : 'Pas encore connecté')}</small></span>
+    <div class="rangee statique membre ${m.enLigne ? 'on' : ''}" data-membre="${esc(m.uid)}" style="--i:${Math.min(i, 12)}">
+      <span class="avatar-pres">${avatarHTML(m.nom, m.uid).replace('class="avatar', 'class="avatar gros').replace(/ data-prof="[^"]*"/, '')}<i class="pastille-pres"></i></span>
+      <span class="libelle"><strong>${esc(m.nom)}</strong><small>${m.statut ? esc(m.statut) : m.enLigne ? 'En ligne maintenant' : (m.vu ? 'Vu ' + esc(etiquette(new Date(m.vu))).toLowerCase() : 'Pas encore connecté')}</small></span>
       ${m.uid === moi ? '<span class="badge">Toi</span>' : m.role === 'admin' ? '<span class="badge">Admin</span>' : ''}
     </div>`).join('') || '<p class="note">Aucun membre pour l\'instant.</p>';
 }
