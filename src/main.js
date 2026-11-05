@@ -2,6 +2,7 @@ import './update.js';
 import * as P from './presence.js';
 import { lancerVisite } from './visite.js';
 import { reglerTheme, theme as themeActuel, THEMES } from './theme.js';
+import { monterFicelle } from './ficelle.js';
 import { monterLumiere, reglerNiveau, niveau as niveauLumiere, NIVEAUX as NIVEAUX_LUMIERE } from './lumiere.js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -49,7 +50,7 @@ const styleLogin = document.createElement('style');
 styleLogin.textContent = `
   .login .ou { margin: 18px 0 8px; opacity: .7; font-size: .9rem; }
   .pseudo-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
-  .pseudo-form input { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 0; border-radius: 12px; font: inherit; background: #f5f7f6; color: #12272b; }
+  .pseudo-form input { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 0; border-radius: 12px; font: inherit; background: #f5f7f6; color: #12272b; position: relative; z-index: 3; }
   .pseudo-form .champ-mdp { position: relative; width: 100%; }
   .pseudo-form .champ-mdp input { padding-right: 48px; }
   .pseudo-form .oeil { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; cursor: pointer; color: #4a5f63; }
@@ -114,13 +115,7 @@ function brancherLampe() {
     if (on) { if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) vaciller(login, 'vac3'); planifierVacillement(login); }
     else { clearTimeout(lampeTimer); login.classList.remove(...MOTIFS); }
   };
-  let y0 = null, dy = 0;
-  const reset = () => { y0 = null; f.classList.remove('tire'); f.style.removeProperty('--tire'); };
-  f.addEventListener('pointerdown', e => { y0 = e.clientY; dy = 0; f.setPointerCapture(e.pointerId); f.classList.add('tire'); });
-  f.addEventListener('pointermove', e => { if (y0 === null) return; dy = Math.max(0, Math.min(e.clientY - y0, 56)); f.style.setProperty('--tire', dy + 'px'); });
-  f.addEventListener('pointerup', () => { if (y0 === null) return; const tire = dy > 26; reset(); if (tire) { if (navigator.vibrate) navigator.vibrate(12); regler(!lampeAllumee); } });
-  f.addEventListener('pointercancel', reset);
-  f.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); regler(!lampeAllumee); } });
+  monterFicelle(login.querySelector('.lampe'), f, () => regler(!lampeAllumee));
 }
 
 function renderLogin(message = '') {
@@ -136,13 +131,12 @@ function renderLogin(message = '') {
   app.innerHTML = `
     <main class="login${lampeAllumee ? ' allume' : ''}${nouveau ? ' nouveau' : ''}">
       <div class="lampe">
-        <i class="cone" aria-hidden="true"></i>
         <svg viewBox="0 0 120 112" aria-hidden="true">
           <defs>
             <linearGradient id="gAbat" x1="0" x2="1"><stop offset="0" stop-color="#1f5258"/><stop offset=".45" stop-color="#143b40"/><stop offset="1" stop-color="#0a2226"/></linearGradient>
             <linearGradient id="gLaiton" x1="0" x2="1"><stop offset="0" stop-color="#8a6417"/><stop offset=".4" stop-color="#F0C766"/><stop offset="1" stop-color="#9a6f1b"/></linearGradient>
-            <radialGradient id="gHalo"><stop offset="0" stop-color="#FFE3A8" stop-opacity=".85"/><stop offset=".45" stop-color="#F5A623" stop-opacity=".3"/><stop offset="1" stop-color="#F5A623" stop-opacity="0"/></radialGradient>
-            <radialGradient id="gVerre" cx=".4" cy=".35"><stop offset="0" stop-color="#FFFBEA"/><stop offset=".6" stop-color="#FFE3A8"/><stop offset="1" stop-color="#F5A623"/></radialGradient>
+            <radialGradient id="gHalo"><stop offset="0" stop-color="#FFF2A0" stop-opacity=".9"/><stop offset=".45" stop-color="#FFD23F" stop-opacity=".35"/><stop offset="1" stop-color="#FFD23F" stop-opacity="0"/></radialGradient>
+            <radialGradient id="gVerre" cx=".4" cy=".35"><stop offset="0" stop-color="#FFFBEA"/><stop offset=".6" stop-color="#FFF08A"/><stop offset="1" stop-color="#FFD23F"/></radialGradient>
           </defs>
           <rect x="53" y="0" width="14" height="5" rx="2" fill="url(#gLaiton)"/>
           <line x1="60" y1="5" x2="60" y2="30" stroke="#6f8a8c" stroke-width="2"/>
@@ -151,12 +145,37 @@ function renderLogin(message = '') {
           <path d="M44 44 C36 52 29 66 25 82" stroke="#ffffff" stroke-opacity=".14" stroke-width="3" fill="none" stroke-linecap="round"/>
           <rect x="12" y="84" width="96" height="5" rx="2.5" fill="url(#gLaiton)"/>
           <circle cx="100" cy="90.5" r="3.4" fill="none" stroke="url(#gLaiton)" stroke-width="1.6"/>
-          <ellipse class="sous-abat" cx="60" cy="87" rx="40" ry="4" fill="#FFE3A8" opacity=".55"/>
+          <ellipse class="sous-abat" cx="60" cy="87" rx="40" ry="4" fill="#FFE680" opacity=".55"/>
           <circle class="halo" cx="60" cy="94" r="38" fill="url(#gHalo)"/>
           <rect x="54" y="86" width="12" height="6" rx="2" fill="url(#gLaiton)"/>
           <circle cx="60" cy="98" r="10" fill="#2c4144" stroke="#4d6568" stroke-width="1"/>
           <circle class="vive" cx="60" cy="98" r="10" fill="url(#gVerre)"/>
           <path d="M55 92 Q57 99 60 96 Q63 99 65 92" stroke="#B9801B" stroke-width="1" fill="none" opacity=".7"/>
+        </svg>
+        <svg class="corde" viewBox="0 0 120 260" aria-hidden="true">
+          <defs>
+            <radialGradient id="gLueur" gradientUnits="userSpaceOnUse" cx="60" cy="98" r="190"><stop offset="0" stop-color="#FFF6B8"/><stop offset=".22" stop-color="#FFE066"/><stop offset=".55" stop-color="#E0A92A"/><stop offset=".85" stop-color="#C58F20" stop-opacity=".35"/><stop offset="1" stop-color="#C58F20" stop-opacity="0"/></radialGradient>
+            <radialGradient id="gBouton" cx=".35" cy=".4" r=".75"><stop offset="0" stop-color="#FFE9B5"/><stop offset=".3" stop-color="#F0C766"/><stop offset=".7" stop-color="#B9801B"/><stop offset="1" stop-color="#7a520f"/></radialGradient>
+            <filter id="fFlou" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter>
+            <mask id="mLumiere" maskUnits="userSpaceOnUse" x="-200" y="0" width="520" height="420"><path d="M-140 48 L60 98 L260 48 L260 400 L-140 400Z" fill="#fff" filter="url(#fFlou)"/></mask>
+          </defs>
+          <g class="ens">
+            <path class="c-base" fill="none" stroke="#3d2b0e" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="c-fil" fill="none" stroke="#8d7d57" stroke-width="2.6" stroke-dasharray="1.6 1.9" stroke-linejoin="round" transform="translate(-.35 0)"/>
+            <g class="lit"><g mask="url(#mLumiere)">
+              <path class="c-lit" fill="none" stroke="url(#gLueur)" stroke-width="2.6" stroke-dasharray="1.6 1.9" stroke-linejoin="round" transform="translate(-.35 0)"/>
+              <path class="c-lum" fill="none" stroke-width=".8" transform="translate(-.7 -.3)"/>
+            </g></g>
+            <g class="bouton">
+              <rect x="-2.6" y="-3" width="5.2" height="5.5" rx="1.5" fill="#a9791f"/>
+              <path d="M0 0 C-6.5 2.5 -7 11 -5.5 16 C-4 21 4 21 5.5 16 C7 11 6.5 2.5 0 0Z" fill="url(#gBouton)"/>
+              <ellipse cx="-2.2" cy="9" rx="1.3" ry="3.4" fill="#fff" opacity=".45"/>
+              <g class="reflets">
+                <path d="M0 0 C-6.5 2.5 -7 11 -5.5 16 C-4 21 4 21 5.5 16 C7 11 6.5 2.5 0 0Z" fill="#FFE680" fill-opacity=".38"/>
+                <ellipse cx="-2.8" cy="7.5" rx="1.6" ry="4.4" fill="#FFFBD0" fill-opacity=".85"/>
+              </g>
+            </g>
+          </g>
         </svg>
         <div role="button" tabindex="0" class="ficelle" id="ficelle" aria-pressed="${lampeAllumee}" aria-label="${lampeAllumee ? 'Éteindre la lampe : tire la ficelle' : 'Allumer la lampe : tire la ficelle'}"></div>
         <span class="indice" aria-hidden="true">Tire la ficelle ↓</span>
@@ -168,11 +187,12 @@ function renderLogin(message = '') {
       </div>` : ''}
       <div class="obscur" aria-hidden="true"></div>
       <div class="penombre" aria-hidden="true"></div>
+      <i class="cone" aria-hidden="true"></i>
       <div class="contenu">
       <h1>EnR Connect</h1>
       <p>Le groupe de discussion de la classe d'énergies renouvelables.</p>
-      <button class="primary" id="btn-login">Continuer avec Google</button>
-      <p class="ou">ou, sans Google</p>
+      <button class="primary" id="btn-login">Continuer avec Gmail</button>
+      <p class="ou">ou, sans Gmail</p>
       <form class="pseudo-form" id="pseudo-form">
         <input id="pseudo" type="text" placeholder="Pseudo" autocapitalize="none" autocomplete="username" maxlength="20" required />
         <div class="champ-mdp">
