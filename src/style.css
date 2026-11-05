@@ -764,7 +764,7 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .layout.lum-off.ecrit .ligne-envoi textarea, .layout.lum-doux.ecrit .ligne-envoi textarea { animation: none; }
 
 /* ---------- Connexion : la lampe à ficelle ---------- */
-.login > .lampe, .login > .obscur, .login > .contenu { animation: none; }
+.login > .lampe, .login > .obscur, .login > .contenu, .login > .cone { animation: none; }
 .login::before, .login::after { z-index: 0; }
 .login > .obscur { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: var(--nuit); opacity: .97; transition: opacity .6s ease; }
 .login.allume > .obscur { opacity: 0; }
