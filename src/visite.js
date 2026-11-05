@@ -25,7 +25,7 @@ let ouverte = false;
 
 function etapes(admin) {
   const liste = [
-    { titre: 'Bienvenue dans EnR Connect 👋', texte: "C'est le groupe de discussion de ta classe d'énergies renouvelables. Une petite visite de 30 secondes pour te montrer à quoi sert chaque partie." },
+    { titre: 'Bienvenue dans EnR Connect', texte: "C'est le groupe de discussion de ta classe d'énergies renouvelables. Une petite visite de 30 secondes pour te montrer à quoi sert chaque partie." },
     { cible: '.marque', titre: 'Le groupe', texte: "Ici, le nom du groupe. En dessous, tu vois combien de personnes sont en ligne. Appuie dessus pour ouvrir la liste des membres." },
     { cible: '#btn-search', titre: 'Rechercher', texte: "Retrouve un ancien message par un mot ou un nom. Appuie sur un résultat pour aller directement au message." },
     { cible: '#fil', titre: 'Le fil de discussion', texte: "Tous les messages de la classe s'affichent ici, jour par jour. Appuie sur un message pour réagir avec un emoji, répondre, copier, ou modifier et supprimer les tiens. Appuie sur une photo de profil pour voir la fiche du membre." },
@@ -39,7 +39,7 @@ function etapes(admin) {
   if (admin) liste.push({ cible: '#btn-admin', titre: 'Administration', texte: "Gérer les administrateurs et nommer de nouvelles personnes. Les administrateurs peuvent aussi supprimer des messages." });
   liste.push(
     { cible: '#btn-set', titre: 'Infos du groupe et réglages', texte: "Tu y trouves : ton profil (photo et statut), la liste des membres, le thème clair ou sombre, les effets de lumière, le mode économique, les notifications, les règles du groupe et le bouton Se déconnecter." },
-    { titre: "C'est parti ! 🎉", texte: "Tu peux revoir cette visite quand tu veux : Réglages → Revoir la visite guidée." }
+    { titre: "C'est parti !", texte: "Tu peux revoir cette visite quand tu veux : Réglages → Revoir la visite guidée." }
   );
   return liste;
 }

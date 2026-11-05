@@ -125,9 +125,9 @@ function renderLogin(message = '') {
   const ins = modePseudo === 'inscription';
   let nouveau = true; try { nouveau = !localStorage.getItem('deja-connecte'); } catch { /* ignoré */ }
   const h = new Date().getHours();
-  const [salut, mot] = h >= 5 && h < 12 ? ['Bonjour 😊', 'Belle matinée à toi.']
-    : h >= 12 && h < 18 ? ['Bon après-midi 😄', 'Content de te voir ici.']
-    : ['Bonsoir 😌', 'Belle soirée à toi.'];
+  const [salut, mot] = h >= 5 && h < 12 ? ['Bonjour', 'Belle matinée à toi. Que ta journée de cours se passe bien.']
+    : h >= 12 && h < 18 ? ['Bon après-midi', 'Content de te voir ici. Courage pour la suite de la journée.']
+    : ['Bonsoir', 'Belle soirée à toi. Repose-toi bien après cette journée.'];
   app.innerHTML = `
     <main class="login${lampeAllumee ? ' allume' : ''}${nouveau ? ' nouveau' : ''}">
       <div class="lampe">
@@ -180,11 +180,12 @@ function renderLogin(message = '') {
         <div role="button" tabindex="0" class="ficelle" id="ficelle" aria-pressed="${lampeAllumee}" aria-label="${lampeAllumee ? 'Éteindre la lampe : tire la ficelle' : 'Allumer la lampe : tire la ficelle'}"></div>
         <span class="indice" aria-hidden="true">Tire la ficelle ↓</span>
       </div>
-      ${nouveau ? `<div class="accueil" aria-live="polite">
+      <div class="accueil" aria-live="polite">
         <b>${salut} !</b>
-        <span>Bienvenue sur EnR Connect, le groupe de la classe d'énergies renouvelables. ${mot}</span>
+        <span class="mot">${mot}</span>
+        <span>Bienvenue sur EnR Connect, le groupe de la classe d'énergies renouvelables.</span>
         <span class="tire">Tire la ficelle de la lampe pour entrer.</span>
-      </div>` : ''}
+      </div>
       <div class="obscur" aria-hidden="true"></div>
       <div class="penombre" aria-hidden="true"></div>
       <i class="cone" aria-hidden="true"></i>
@@ -349,6 +350,7 @@ async function gererUtilisateur(user) {
   state.role = await resolveRole(user);
   localStorage.setItem('role:' + mailOf(user), state.role);
   if (state.role === 'refused') return renderRefused();
+  if (!accueilVu(user.uid)) return afficherAccueilGroupe(user.uid, startChat);
   startChat();
 }
 
@@ -744,11 +746,21 @@ function ligneHTML(x, debut, fin) {
     </div>`;
 }
 
-/* Message de bienvenue du groupe : affiché tout en haut du fil, avant le premier message */
+/* Message de bienvenue du groupe : écran affiché une seule fois, à la première connexion, avant la messagerie */
+const accueilVu = uid => { try { return localStorage.getItem('accueil-vu:' + uid) === '1'; } catch { return false; } };
+function afficherAccueilGroupe(uid, suite) {
+  stopAll();
+  app.innerHTML = `<main class="ecran-accueil">${accueilGroupeHTML()}
+    <button class="primary" id="btn-compris">J'ai compris</button></main>`;
+  document.getElementById('btn-compris').onclick = () => {
+    try { localStorage.setItem('accueil-vu:' + uid, '1'); } catch { /* ignoré */ }
+    suite();
+  };
+}
 function accueilGroupeHTML() {
   return `<section class="bienvenue-groupe" aria-label="Bienvenue dans le groupe">
     <span class="avatar-groupe grand"><span class="logo grand"></span></span>
-    <h2>Bienvenue dans EnR Connect 👋</h2>
+    <h2>Bienvenue dans EnR Connect</h2>
     <p class="sous">Le groupe réservé uniquement à la filière ER1 (énergies renouvelables), 1ère année.</p>
     <h3>Pourquoi ce groupe ?</h3>
     <p>Pour que tous les étudiants de la filière ER1, première année, soient au même endroit : un seul espace pour les informations des cours, les devoirs, les projets et les annonces. Ce groupe est fait pour nous seuls, donc plus besoin de chercher dans dix discussions différentes : si c'est important pour la filière, c'est ici.</p>
@@ -758,7 +770,7 @@ function accueilGroupeHTML() {
     <p>Les doyens font aussi partie du groupe : si tu as un souci (cours, emploi du temps, administration), tu peux les écrire ici et ils t'aideront. Leurs annonces sont officielles.</p>
     <h3>Pour tous les étudiants de la filière</h3>
     <p>Que tu sois en tête de classe ou que tu aies besoin d'un coup de main, ta place est ici. Pose tes questions sans gêne, partage ce que tu as compris et aide ceux qui sont en difficulté : on avance mieux ensemble.</p>
-    <p class="fin">Respecte tes camarades, reste dans le sujet de la classe et lis les annonces des administrateurs. Bon courage à tous ! ⚡</p>
+    <p class="fin">Respecte tes camarades, reste dans le sujet de la classe et lis les annonces des administrateurs. Bon courage à tous !</p>
   </section>`;
 }
 
@@ -778,7 +790,7 @@ function renderFeed() {
   const plus = ms.length >= state.limit
     ? '<button class="plus-anciens" data-plus="1">Voir les messages précédents</button>' : '';
 
-  fil.innerHTML = (ms.length >= state.limit ? '' : accueilGroupeHTML()) + (ms.length
+  fil.innerHTML = (ms.length
     ? plus + infos.map((x, i) => {
         const suiv = infos[i + 1];
         return (x.jour ? `<div class="jour"><span>${esc(libelleJour(x.d))}</span></div>` : '')
