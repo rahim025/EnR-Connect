@@ -1,0 +1,49 @@
+name: Publier le site
+
+# À chaque modification poussée sur main, le site est reconstruit et publié automatiquement.
+# L'appli Android affiche ce site : elle se met donc à jour toute seule.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Installer les dépendances
+        run: npm install
+
+      - name: Construire le site
+        run: npm run build
+        env:
+          VITE_BUILD: ${{ github.run_number }}
+
+      - name: Numéro de version du site
+        run: |
+          echo '{"build": ${{ github.run_number }}}' > dist/version.json
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

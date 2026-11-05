@@ -1,8 +1,17 @@
 name: Construire l'APK
 
+# L'APK n'est reconstruit que pour les changements natifs (notifications, icône, signature…).
+# Les changements de l'interface passent par le site (site.yml) et arrivent tout seuls dans l'appli.
 on:
   push:
     branches: [main]
+    paths:
+      - 'native/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'assets/**'
+      - 'keystore/**'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 permissions:
