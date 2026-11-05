@@ -23,7 +23,7 @@ const PAGE = 30; // nombre de messages chargés à la fois (mode ultra léger)
 
 const state = {
   user: null,
-  role: null,            // 'admin' | 'member' | 'refused'
+  role: null,            // 'createur' | 'admin' | 'member' | 'refused'
   eco: localStorage.getItem('eco') !== 'off', // mode économique : photos masquées tant qu'on n'appuie pas
   messages: [],
   limit: PAGE,
@@ -320,9 +320,12 @@ function renderRefused() {
   document.getElementById('btn-out').onclick = () => signOut(auth);
 }
 
+const estAdmin = () => state.role === 'admin' || state.role === 'createur';
+
 async function resolveRole(user) {
   const mail = mailOf(user);
   try {
+    if (user.emailVerified && (await getDoc(doc(db, 'createurs', mail))).exists()) return 'createur';
     if (user.emailVerified && (await getDoc(doc(db, 'admins', mail))).exists()) return 'admin';
     return 'member';
   } catch (e) {
@@ -517,7 +520,7 @@ function startChat() {
   chargerEpingle();
   chargerMonProfil();
   demarrerNotifs();
-  setTimeout(() => lancerVisite({ uid: state.user.uid, admin: state.role === 'admin' }), 700);
+  setTimeout(() => lancerVisite({ uid: state.user.uid, admin: estAdmin() }), 700);
   P.demarrer({ db, uid: state.user.uid, nom: nomAffiche(state.user), role: state.role, onChange: majPresenceUI });
 }
 
@@ -538,7 +541,7 @@ window.addEventListener('online', renderStatut);
 window.addEventListener('offline', renderStatut);
 
 function renderShell() {
-  const admin = state.role === 'admin';
+  const admin = estAdmin();
   app.innerHTML = `
     <div class="layout">
       <div class="ciel" aria-hidden="true">
@@ -699,7 +702,7 @@ function reacsHTML(m) {
 function detailHTML(m, moi) {
   const sel = state.sel === m.id;
   if (!m.pending && !sel) return '';
-  const admin = state.role === 'admin';
+  const admin = estAdmin();
   let h = m.pending ? `<div class="detail"><span class="attente">${ICON.clock}En attente d'envoi</span></div>` : '';
   if (sel && !m.pending) {
     const r = m.reactions || {};
@@ -914,7 +917,7 @@ function allerAuMessage(id) {
 
 /* Message épinglé (administrateurs) : un seul document, relu au lancement et au retour dans l'appli */
 async function epingler(id) {
-  const m = trouver(id); if (!m || state.role !== 'admin') return;
+  const m = trouver(id); if (!m || !estAdmin()) return;
   state.sel = null;
   const data = { id: m.id, name: m.name, text: extrait(m, 400), by: nomAffiche(state.user) };
   try {
@@ -929,7 +932,7 @@ function majEpingle() {
   if (!e) { b.hidden = true; b.innerHTML = ''; return; }
   b.hidden = false;
   b.innerHTML = `<button type="button" class="ep-corps" id="ep-ouvrir">${ICON.epingle}<span class="ep-txt"><strong>Message épinglé · ${esc(e.name)}</strong><span>${esc(e.text)}</span></span></button>`
-    + (state.role === 'admin' ? `<button type="button" class="icone" id="ep-retirer" aria-label="Retirer le message épinglé">${ICON.fermer}</button>` : '');
+    + (estAdmin() ? `<button type="button" class="icone" id="ep-retirer" aria-label="Retirer le message épinglé">${ICON.fermer}</button>` : '');
   b.querySelector('#ep-ouvrir').onclick = async () => {
     const present = !!trouver(e.id);
     const ok = await confirmer('Message épinglé · ' + e.name, e.text, present ? 'Voir le message' : 'Fermer', present ? 'Fermer' : null, true);
@@ -986,7 +989,7 @@ async function ouvrirFiche(uid) {
       <div class="dialogue fiche" role="dialog" aria-modal="true" aria-label="Profil de ${esc(d.name)}">
         ${avatarHTML(d.name, uid).replace('class="avatar', 'class="avatar enorme').replace(/ data-prof="[^"]*"/, '')}
         <h3>${esc(d.name)}</h3>
-        <div class="badges">${d.role === 'admin' ? '<span class="badge">Admin</span>' : ''}${enLigne ? '<span class="badge en-ligne">En ligne</span>' : ''}${moi ? '<span class="badge">Toi</span>' : ''}</div>
+        <div class="badges">${d.role === 'createur' ? '<span class="badge">Créateur</span>' : d.role === 'admin' ? '<span class="badge">Admin</span>' : ''}${enLigne ? '<span class="badge en-ligne">En ligne</span>' : ''}${moi ? '<span class="badge">Toi</span>' : ''}</div>
         <p class="statut-fiche">${p.statut ? esc(p.statut) : '<em>Pas de statut</em>'}</p>
         ${!enLigne && d.vu ? `<p class="vu-fiche">Vu ${esc(etiquette(new Date(d.vu))).toLowerCase()}</p>` : ''}
         <div class="boutons"><button type="button" class="annuler">Fermer</button>${moi ? '<button type="button" class="valider neutre" id="edit-profil">Modifier mon profil</button>' : ''}</div>
@@ -1065,7 +1068,7 @@ function envoyer() {
     return;
   }
   if (!text) { envoyerMessage('👍'); return; } // zone vide : le bouton envoie un « J'aime »
-  envoyerMessage(text, state.announce && state.role === 'admin' ? 'announce' : 'text');
+  envoyerMessage(text, state.announce && estAdmin() ? 'announce' : 'text');
   box.value = ''; box.style.height = '';
   const lay = document.querySelector('.layout'); if (lay) lay.classList.remove('ecrit');
   state.announce = false; majAnnonce(); majBoutonEnvoi();
@@ -1202,7 +1205,7 @@ const enteteHTML = titre =>
   `<header class="entete-panneau"><button class="icone" id="close" aria-label="Retour">${ICON.retour}</button><h2>${esc(titre)}</h2></header>`;
 
 function renderSettings(p) {
-  const admin = state.role === 'admin';
+  const admin = estAdmin();
   p.innerHTML = `
     ${enteteHTML('Infos du groupe')}
     <div class="corps">
@@ -1282,7 +1285,7 @@ function renderSettings(p) {
       <h3 class="titre-section">Compte</h3>
       <div class="rangee statique">
         <span class="pastille">${ICON.user}</span>
-        <span class="libelle"><strong>${esc(nomAffiche(state.user))}</strong><small>${esc(estPseudo(state.user) ? 'Compte avec pseudo' : state.user.email)} · ${admin ? 'Administrateur' : 'Membre'}</small></span>
+        <span class="libelle"><strong>${esc(nomAffiche(state.user))}</strong><small>${esc(estPseudo(state.user) ? 'Compte avec pseudo' : state.user.email)} · ${state.role === 'createur' ? 'Créateur' : admin ? 'Administrateur' : 'Membre'}</small></span>
       </div>
       <button class="rangee rouge" id="logout">
         <span class="pastille">${ICON.logout}</span>
@@ -1388,7 +1391,7 @@ function remplirMembres() {
     <div class="rangee statique membre ${m.enLigne ? 'on' : ''}" data-membre="${esc(m.uid)}" style="--i:${Math.min(i, 12)}">
       <span class="avatar-pres">${avatarHTML(m.nom, m.uid).replace('class="avatar', 'class="avatar gros').replace(/ data-prof="[^"]*"/, '')}<i class="pastille-pres"></i></span>
       <span class="libelle"><strong>${esc(m.nom)}</strong><small>${m.statut ? esc(m.statut) : m.enLigne ? 'En ligne maintenant' : (m.vu ? 'Vu ' + esc(etiquette(new Date(m.vu))).toLowerCase() : 'Pas encore connecté')}</small></span>
-      ${m.uid === moi ? '<span class="badge">Toi</span>' : m.role === 'admin' ? '<span class="badge">Admin</span>' : ''}
+      ${m.uid === moi ? '<span class="badge">Toi</span>' : m.role === 'createur' ? '<span class="badge">Créateur</span>' : m.role === 'admin' ? '<span class="badge">Admin</span>' : ''}
     </div>`).join('') || '<p class="note">Aucun membre pour l\'instant.</p>';
 }
 
@@ -1397,7 +1400,7 @@ function renderAdmin(p) {
     ${enteteHTML('Administration')}
     <div class="corps">
       <h3 class="titre-section">Ajouter un administrateur</h3>
-      <p class="note">Tout le monde peut entrer dans le groupe avec son compte Google. Un administrateur peut publier des annonces, supprimer des messages et nommer d'autres administrateurs.</p>
+      <p class="note">Tout le monde peut entrer dans le groupe avec son compte Google. Un administrateur peut publier des annonces, supprimer des messages et nommer d'autres administrateurs. Seul le créateur peut retirer un administrateur.</p>
       <form class="ajout" id="ajout">
         <input type="email" id="nouveau" placeholder="prenom.nom@gmail.com" autocapitalize="none" required />
         <button class="primary" type="submit">Ajouter</button>
@@ -1425,11 +1428,11 @@ function renderAdmin(p) {
       <div class="rangee statique">
         ${avatarHTML(d.id, d.id)}
         <span class="libelle"><strong>${esc(d.id)}</strong></span>
-        ${d.id === moi ? '<span class="badge">Toi</span>' : `<button class="danger" data-rm="${esc(d.id)}">Retirer</button>`}
+        ${d.id === moi ? '<span class="badge">Toi</span>' : state.role === 'createur' ? `<button class="danger" data-rm="${esc(d.id)}">Retirer</button>` : ''}
       </div>`).join('') || '<p class="note">Aucun administrateur.</p>';
   });
   p.querySelector('#liste').onclick = async e => {
-    const mail = e.target.dataset.rm; if (!mail) return;
+    const mail = e.target.dataset.rm; if (!mail || state.role !== 'createur') return;
     if (!(await confirmer('Retirer cet administrateur ?', mail, 'Retirer'))) return;
     await deleteDoc(doc(db, 'admins', mail)).catch(() => toast('Action impossible.'));
   };
