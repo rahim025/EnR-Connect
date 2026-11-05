@@ -7,8 +7,26 @@
   <meta name="theme-color" content="#242526" media="(prefers-color-scheme: dark)" />
   <title>EnR Connect</title>
   <link rel="stylesheet" href="/src/style.css" />
+  <style>
+    #splash { position: fixed; inset: 0; z-index: 200; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #fff; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: radial-gradient(90% 55% at 50% 38%, #F5A62326 0%, transparent 70%), #0B2327; transition: opacity .5s ease, transform .5s ease; }
+    #splash.fin { opacity: 0; transform: scale(1.04); pointer-events: none; }
+    #splash .astre { position: relative; width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FFE3A8, #F5A623 62%); box-shadow: 0 0 40px 6px #F5A62366; animation: sp-respire 2.4s ease-in-out infinite; }
+    #splash .astre::before, #splash .astre::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; border: 2px solid #F5A62355; animation: sp-onde 2.4s ease-out infinite; }
+    #splash .astre::after { animation-delay: 1.2s; }
+    #splash b { margin-top: 28px; font-size: 1.7rem; letter-spacing: .02em; animation: sp-monte .8s ease both .15s; }
+    #splash small { color: #9DB7B5; letter-spacing: .14em; text-transform: uppercase; font-size: .72rem; animation: sp-monte .8s ease both .3s; }
+    #splash .barre { margin-top: 30px; width: 120px; height: 3px; border-radius: 3px; background: #ffffff1f; overflow: hidden; }
+    #splash .barre i { display: block; height: 100%; width: 40%; border-radius: 3px; background: linear-gradient(90deg, transparent, #F5A623, #FFE3A8); animation: sp-charge 1.3s ease-in-out infinite; }
+    @keyframes sp-respire { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+    @keyframes sp-onde { from { transform: scale(.85); opacity: .9; } to { transform: scale(2.1); opacity: 0; } }
+    @keyframes sp-monte { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes sp-charge { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+    @media (prefers-reduced-motion: reduce) { #splash *, #splash *::before, #splash *::after { animation: none !important; } }
+  </style>
 </head>
 <body>
+  <div id="splash" aria-hidden="true"><span class="astre"></span><b>EnR Connect</b><small>Énergies renouvelables</small><span class="barre"><i></i></span></div>
   <div id="app"></div>
   <script type="module" src="/src/main.js"></script>
 </body>
