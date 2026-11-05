@@ -869,3 +869,19 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
   background: radial-gradient(ellipse 170% 110% at 82px 98px, #0B232700 0, #0B232700 30%, #0B23272e 70%, #0B232766 100%);
 }
 .login.allume > .penombre { opacity: 1; }
+
+/* Message de bienvenue du groupe, en tête du fil */
+.bienvenue-groupe { margin: 8px 4px 18px; padding: 20px 18px; border-radius: 18px; background: var(--carte, #ffffff0d); border: 1px solid #F5A62333; text-align: left; color: var(--texte2); line-height: 1.5; font-size: .92rem; }
+.bienvenue-groupe .avatar-groupe { display: block; margin: 0 auto 10px; width: max-content; }
+.bienvenue-groupe h2 { margin: 0; text-align: center; font-size: 1.2rem; color: var(--texte); }
+.bienvenue-groupe .sous { margin: 4px 0 14px; text-align: center; font-size: .85rem; }
+.bienvenue-groupe h3 { margin: 14px 0 4px; font-size: .95rem; color: #F5A623; }
+.bienvenue-groupe p { margin: 0; }
+.bienvenue-groupe .fin { margin-top: 16px; text-align: center; color: var(--texte); font-weight: 600; }
+
+/* PDF dans le fil et boutons de l'appel de groupe */
+.fichier-pdf { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 210px; text-align: left; padding: 4px 2px; color: inherit; }
+.fichier-pdf svg { width: 32px; height: 32px; flex: none; opacity: .9; }
+.fichier-pdf strong { display: block; font-size: .95rem; overflow-wrap: anywhere; }
+.fichier-pdf small { display: block; opacity: .75; font-size: .78rem; }
+.dialogue .boutons.appel { flex-wrap: wrap; }

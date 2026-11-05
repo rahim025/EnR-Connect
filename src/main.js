@@ -5,6 +5,7 @@ import { reglerTheme, theme as themeActuel, THEMES } from './theme.js';
 import { monterFicelle } from './ficelle.js';
 import { monterLumiere, reglerNiveau, niveau as niveauLumiere, NIVEAUX as NIVEAUX_LUMIERE } from './lumiere.js';
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
   GoogleAuthProvider, signInWithCredential, signInWithPopup, onAuthStateChanged, signOut,
@@ -124,10 +125,9 @@ function renderLogin(message = '') {
   const ins = modePseudo === 'inscription';
   let nouveau = true; try { nouveau = !localStorage.getItem('deja-connecte'); } catch { /* ignoré */ }
   const h = new Date().getHours();
-  const [salut, mot] = h >= 5 && h < 12 ? ['Bonjour', 'Belle matinée à toi.']
-    : h >= 12 && h < 14 ? ['Bon midi', 'Profite bien de ta pause.']
-    : h >= 14 && h < 18 ? ['Bon après-midi', 'Content de te voir ici.']
-    : ['Bonsoir', 'Belle soirée à toi.'];
+  const [salut, mot] = h >= 5 && h < 12 ? ['Bonjour 😊', 'Belle matinée à toi.']
+    : h >= 12 && h < 18 ? ['Bon après-midi 😄', 'Content de te voir ici.']
+    : ['Bonsoir 😌', 'Belle soirée à toi.'];
   app.innerHTML = `
     <main class="login${lampeAllumee ? ' allume' : ''}${nouveau ? ' nouveau' : ''}">
       <div class="lampe">
@@ -356,6 +356,8 @@ async function gererUtilisateur(user) {
 const S = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const F = d => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
 const ICON = {
+  fichier: S('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/>'),
+  telephone: S('<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>'),
   retour: S('<path d="M15 5l-7 7 7 7"/>'),
   recherche: S('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
   repondre: S('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v3"/>'),
@@ -550,6 +552,7 @@ function renderShell() {
           </div>
         </div>
         <div class="actions-entete">
+          <button class="icone" id="btn-appel" aria-label="Appel de groupe">${ICON.telephone}</button>
           <button class="icone" id="btn-search" aria-label="Rechercher dans les messages">${ICON.recherche}</button>
           ${admin ? `<button class="icone" id="btn-admin" aria-label="Administration">${ICON.shield}</button>` : ''}
           <button class="icone" id="btn-set" aria-label="Infos du groupe et réglages">${ICON.gear}</button>
@@ -563,6 +566,7 @@ function renderShell() {
         <div class="bandeau-annonce" id="bandeau" hidden>${ICON.megaphone}<span>Ce message sera publié comme annonce</span></div>
         <div class="ligne-envoi">
           <button type="button" class="icone accent" id="btn-photo" aria-label="Envoyer une photo">${ICON.camera}</button>
+          <button type="button" class="icone accent" id="btn-pdf" aria-label="Envoyer un PDF">${ICON.fichier}</button>
           ${admin ? `<button type="button" class="icone accent" id="btn-annonce" aria-label="Publier comme annonce" aria-pressed="false">${ICON.megaphone}</button>` : ''}
           <textarea id="texte" rows="1" placeholder="Message" maxlength="2000" aria-label="Message"></textarea>
           <button class="send" type="submit" id="btn-send" data-mode="like" aria-label="Envoyer un J'aime">
@@ -571,6 +575,7 @@ function renderShell() {
         </div>
       </form>
       <input type="file" id="file" accept="image/*" hidden />
+      <input type="file" id="file-pdf" accept="application/pdf" hidden />
     </div>`;
 
   const box = document.getElementById('texte');
@@ -588,6 +593,9 @@ function renderShell() {
   document.getElementById('form').onsubmit = e => { e.preventDefault(); envoyer(); };
   document.getElementById('btn-photo').onclick = () => document.getElementById('file').click();
   document.getElementById('file').onchange = onPickPhoto;
+  document.getElementById('btn-pdf').onclick = () => document.getElementById('file-pdf').click();
+  document.getElementById('file-pdf').onchange = onPickPdf;
+  document.getElementById('btn-appel').onclick = ouvrirAppel;
   document.getElementById('btn-set').onclick = () => openPanel('settings');
   document.getElementById('btn-search').onclick = () => openPanel('search');
   const ba = document.getElementById('btn-admin'); if (ba) ba.onclick = () => openPanel('admin');
@@ -663,12 +671,15 @@ function contenuHTML(m) {
     if (mediaCache.has(m.mediaId)) return `<img src="${mediaCache.get(m.mediaId)}" alt="Photo envoyée par ${esc(m.name)}" />`;
     return `<button class="media-masque" data-media="${esc(m.mediaId)}">${ICON.image}<span><strong>Photo masquée</strong><small>${m.taille ? m.taille + ' Ko · ' : ''}Appuie pour charger</small></span></button>`;
   }
+  if (m.kind === 'pdf') {
+    return `<button type="button" class="fichier-pdf" data-pdf="${esc(m.mediaId)}" data-nom="${esc(m.nom || 'document.pdf')}">${ICON.fichier}<span><strong>${esc(m.nom || 'Document PDF')}</strong><small>PDF${m.taille ? ' · ' + m.taille + ' Ko' : ''} · Appuie pour ouvrir</small></span></button>`;
+  }
   return `<div class="texte">${lierURL(esc(m.text)).replace(/\n/g, '<br>')}${m.editedAt ? '<span class="modifie">modifié</span>' : ''}</div>`;
 }
 
 const REACTIONS = [['coeur', '❤️'], ['pouce', '👍'], ['rire', '😂'], ['wow', '😮'], ['triste', '😢'], ['merci', '🙏']];
 const trouver = id => state.messages.find(m => m.id === id);
-const extrait = (m, n = 90) => m.kind === 'image' ? '📷 Photo' : String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, n);
+const extrait = (m, n = 90) => m.kind === 'image' ? '📷 Photo' : m.kind === 'pdf' ? '📄 ' + (m.nom || 'PDF') : String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, n);
 const monAv = () => (profils.get(state.user.uid) || {}).pv || 0;
 
 const citationHTML = m => m.reply
@@ -694,9 +705,9 @@ function detailHTML(m, moi) {
       `<button type="button" class="${(r[k] || []).includes(state.user.uid) ? 'actif' : ''}" data-react="${k}" data-id="${m.id}" aria-label="Réagir ${e}">${e}</button>`).join('')}</div>`;
     h += `<div class="detail actions-msg"><span>${esc(etiquette(dateDe(m)))}</span>
       <button type="button" data-reply="${m.id}">${ICON.repondre}Répondre</button>
-      ${m.kind !== 'image' ? `<button type="button" data-copy="${m.id}">${ICON.copier}Copier</button>` : ''}
+      ${m.kind !== 'image' && m.kind !== 'pdf' ? `<button type="button" data-copy="${m.id}">${ICON.copier}Copier</button>` : ''}
       ${moi && m.kind === 'text' && m.text !== '👍' ? `<button type="button" data-edit="${m.id}">${ICON.crayon}Modifier</button>` : ''}
-      ${admin && m.kind !== 'image' ? `<button type="button" data-pin="${m.id}">${ICON.epingle}Épingler</button>` : ''}
+      ${admin && m.kind !== 'image' && m.kind !== 'pdf' ? `<button type="button" data-pin="${m.id}">${ICON.epingle}Épingler</button>` : ''}
       ${(admin || moi) ? `<button type="button" class="suppr" data-del="${m.id}">Supprimer</button>` : ''}
     </div>`;
   }
@@ -733,6 +744,24 @@ function ligneHTML(x, debut, fin) {
     </div>`;
 }
 
+/* Message de bienvenue du groupe : affiché tout en haut du fil, avant le premier message */
+function accueilGroupeHTML() {
+  return `<section class="bienvenue-groupe" aria-label="Bienvenue dans le groupe">
+    <span class="avatar-groupe grand"><span class="logo grand"></span></span>
+    <h2>Bienvenue dans EnR Connect 👋</h2>
+    <p class="sous">Le groupe réservé uniquement à la filière ER1 (énergies renouvelables), 1ère année.</p>
+    <h3>Pourquoi ce groupe ?</h3>
+    <p>Pour que tous les étudiants de la filière ER1, première année, soient au même endroit : un seul espace pour les informations des cours, les devoirs, les projets et les annonces. Ce groupe est fait pour nous seuls, donc plus besoin de chercher dans dix discussions différentes : si c'est important pour la filière, c'est ici.</p>
+    <h3>Pourquoi cette application ?</h3>
+    <p>Parce qu'on a voulu une messagerie à nous, simple et très légère. Elle consomme peu de données grâce au mode économique, garde tes messages même sans réseau et les envoie dès que la connexion revient.</p>
+    <h3>Les doyens sont avec nous</h3>
+    <p>Les doyens font aussi partie du groupe : si tu as un souci (cours, emploi du temps, administration), tu peux les écrire ici et ils t'aideront. Leurs annonces sont officielles.</p>
+    <h3>Pour tous les étudiants de la filière</h3>
+    <p>Que tu sois en tête de classe ou que tu aies besoin d'un coup de main, ta place est ici. Pose tes questions sans gêne, partage ce que tu as compris et aide ceux qui sont en difficulté : on avance mieux ensemble.</p>
+    <p class="fin">Respecte tes camarades, reste dans le sujet de la classe et lis les annonces des administrateurs. Bon courage à tous ! ⚡</p>
+  </section>`;
+}
+
 function renderFeed() {
   const fil = document.getElementById('fil'); if (!fil) return;
   const proche = fil.scrollHeight - fil.scrollTop - fil.clientHeight < 140;
@@ -749,14 +778,14 @@ function renderFeed() {
   const plus = ms.length >= state.limit
     ? '<button class="plus-anciens" data-plus="1">Voir les messages précédents</button>' : '';
 
-  fil.innerHTML = ms.length
+  fil.innerHTML = (ms.length >= state.limit ? '' : accueilGroupeHTML()) + (ms.length
     ? plus + infos.map((x, i) => {
         const suiv = infos[i + 1];
         return (x.jour ? `<div class="jour"><span>${esc(libelleJour(x.d))}</span></div>` : '')
           + (x.temps ? `<div class="temps">${esc(heureCourte(x.d))}</div>` : '')
           + ligneHTML(x, x.rompt, !suiv || suiv.rompt);
       }).join('')
-    : `<div class="vide"><span class="logo grand"></span><strong>Aucun message pour l'instant</strong><span>Écris le premier.</span></div>`;
+    : `<div class="vide"><strong>Aucun message pour l'instant</strong><span>Écris le premier.</span></div>`);
 
   if (proche) fil.scrollTop = fil.scrollHeight;
   // Un nouveau message arrive : il apparaît dans un éclat de lumière
@@ -797,6 +826,7 @@ async function onFeedClick(e) {
   const d = t.dataset;
   if (d.plus) { t.textContent = 'Chargement…'; state.limit += PAGE; subscribeMessages(); return; }
   if (d.media) { t.querySelector('strong').textContent = 'Chargement…'; loadMedia(d.media); return; }
+  if (d.pdf) { ouvrirPdf(d.pdf, d.nom); return; }
   if (d.del) {
     const ok = await confirmer('Supprimer ce message ?', 'Il sera supprimé pour tout le monde dans le groupe.', 'Supprimer');
     if (ok) { state.sel = null; deleteDoc(doc(db, 'messages', d.del)).catch(() => toast('Suppression impossible.')); }
@@ -1029,6 +1059,77 @@ function envoyer() {
   state.announce = false; majAnnonce(); majBoutonEnvoi();
 }
 
+/* ---------- PDF (stockés comme les photos : 700 Ko maximum) ---------- */
+const PDF_MAX = 700 * 1024;
+async function onPickPdf(e) {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) { toast('Choisis un fichier PDF.'); return; }
+  if (file.size > PDF_MAX) { toast('PDF trop lourd : 700 Ko maximum. Réduis-le d\'abord.'); return; }
+  try {
+    const data = await new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(file); });
+    const nom = file.name.slice(0, 80);
+    const taille = Math.max(1, Math.round(file.size / 1024));
+    const mref = doc(collection(db, 'media'));
+    mediaCache.set(mref.id, data);
+    setDoc(mref, { uid: state.user.uid, data, kind: 'pdf', nom, createdAt: serverTimestamp() }).catch(console.error);
+    addDoc(collection(db, 'messages'), {
+      uid: state.user.uid, name: nomAffiche(state.user), kind: 'pdf', mediaId: mref.id, nom, taille, av: monAv(), createdAt: serverTimestamp()
+    }).catch(console.error);
+  } catch (err) {
+    toast('Impossible de préparer ce PDF.');
+  }
+}
+
+async function ouvrirPdf(id, nom) {
+  try {
+    if (!mediaCache.has(id)) {
+      toast('Chargement du PDF…');
+      const snap = await getDoc(doc(db, 'media', id));
+      if (!snap.exists()) { toast('PDF introuvable.'); return; }
+      mediaCache.set(id, snap.data().data);
+    }
+    const [, b64] = String(mediaCache.get(id)).split(',');
+    const bin = atob(b64); const oct = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) oct[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([oct], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = nom || 'document.pdf'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    console.error(err); toast('Impossible d\'ouvrir ce PDF.');
+  }
+}
+
+/* ---------- Appels de groupe (vocal ou vidéo) via une salle Jitsi Meet partagée ---------- */
+const SALLE_APPEL = 'https://meet.jit.si/EnRConnect-ER1-Annee1';
+function ouvrirAppel() {
+  const o = document.createElement('div');
+  o.className = 'voile';
+  o.innerHTML = `
+    <div class="dialogue" role="dialog" aria-modal="true" aria-label="Appel de groupe">
+      <h3>Appel de groupe</h3>
+      <p>Tout le groupe ER1 peut rejoindre la même salle. Un message avec le lien est envoyé dans la discussion.</p>
+      <div class="boutons appel">
+        <button type="button" class="annuler">Annuler</button>
+        <button type="button" class="valider neutre" data-mode="voix">Appel vocal</button>
+        <button type="button" class="valider" data-mode="video">Appel vidéo</button>
+      </div>
+    </div>`;
+  document.body.appendChild(o);
+  const fin = () => o.remove();
+  o.querySelector('.annuler').onclick = fin;
+  o.onclick = e => { if (e.target === o) fin(); };
+  o.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { fin(); lancerAppel(b.dataset.mode === 'video'); });
+}
+function lancerAppel(video) {
+  const url = SALLE_APPEL + (video ? '' : '#config.startWithVideoMuted=true');
+  envoyerMessage((video ? '📹 Appel vidéo de groupe' : '📞 Appel vocal de groupe') + ' lancé par ' + nomAffiche(state.user) + '. Rejoins-nous : ' + url);
+  if (NATIF) Browser.open({ url }).catch(() => window.open(url, '_blank'));
+  else window.open(url, '_blank', 'noopener');
+}
+
 /* ---------- Photos (compressées pour économiser les mégas) ---------- */
 function compress(file, maxSide = 640, quality = 0.5) {
   return new Promise((resolve, reject) => {
@@ -1216,7 +1317,7 @@ function renderRecherche(p) {
     if (t.length < 2) { z.innerHTML = `<p class="note">Tape au moins 2 lettres. La recherche porte sur les ${state.messages.length} derniers messages chargés. Pour remonter plus loin, utilise « Voir les messages précédents » dans la discussion.</p>`; return; }
     const res = state.messages.filter(m => (m.kind !== 'image' && String(m.text || '').toLowerCase().includes(t)) || String(m.name || '').toLowerCase().includes(t)).reverse().slice(0, 60);
     z.innerHTML = res.length
-      ? res.map(m => `<button type="button" class="resultat" data-go="${esc(m.id)}"><span class="r-haut"><strong>${esc(m.name)}</strong><small>${esc(etiquette(dateDe(m)))}</small></span><span class="r-texte">${m.kind === 'image' ? '📷 Photo' : surligner(m.text, t)}</span></button>`).join('')
+      ? res.map(m => `<button type="button" class="resultat" data-go="${esc(m.id)}"><span class="r-haut"><strong>${esc(m.name)}</strong><small>${esc(etiquette(dateDe(m)))}</small></span><span class="r-texte">${m.kind === 'image' ? '📷 Photo' : m.kind === 'pdf' ? '📄 ' + esc(m.nom || 'PDF') : surligner(m.text, t)}</span></button>`).join('')
       : '<p class="note">Aucun message trouvé.</p>';
   };
   q.oninput = afficher; afficher();
@@ -1243,10 +1344,11 @@ function renderAbout(p) {
         <li>Pas de spam, de chaînes de messages ni de publicité.</li>
         <li>Ne partage jamais les informations privées ou les photos d'une personne sans son accord.</li>
         <li>Les annonces des administrateurs sont officielles : lis-les avant de poser une question.</li>
+        <li>Un souci avec les cours ou l'administration ? Écris-le dans le groupe : les doyens y sont pour t'aider.</li>
         <li>Un problème ou un abus ? Préviens un administrateur.</li>
       </ol>
       <h3 class="titre-section">Bon à savoir</h3>
-      <p class="note">Appuie sur un message pour réagir, répondre, copier, modifier ou supprimer le tien. Les photos sont réduites automatiquement. En mode économique, elles restent masquées jusqu'à ce que tu appuies dessus.</p>
+      <p class="note">Appuie sur un message pour réagir, répondre, copier, modifier ou supprimer le tien. Tu peux envoyer des photos et des PDF (700 Ko maximum), et lancer un appel vocal ou vidéo de groupe avec le bouton téléphone en haut. Les photos sont réduites automatiquement. En mode économique, elles restent masquées jusqu'à ce que tu appuies dessus.</p>
     </div>`;
   p.querySelector('#close').onclick = closePanel;
 }
