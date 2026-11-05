@@ -28,6 +28,25 @@
 <body>
   <div id="splash" aria-hidden="true"><span class="astre"></span><b>EnR Connect</b><small>Énergies renouvelables</small><span class="barre"><i></i></span></div>
   <div id="app"></div>
+  <script>
+    // Filet de sécurité : si le code de l'appli n'a pas démarré après 9 s (site en cours de mise à jour, fichier introuvable, vieux cache),
+    // on le dit au lieu de tourner dans le vide, et on propose de tout recharger proprement.
+    setTimeout(function () {
+      var sp = document.getElementById('splash'); if (!sp) return;
+      var d = document.createElement('div');
+      d.style.cssText = 'position:absolute;left:0;right:0;bottom:16%;text-align:center;padding:0 28px';
+      d.innerHTML = '<p style="margin:0 0 14px;color:#cfe0de;font-size:.95rem">Le chargement prend plus de temps que prévu.</p>'
+        + '<button id="spr" style="border:0;border-radius:14px;padding:13px 26px;font:700 1rem system-ui,sans-serif;background:#F5A623;color:#1b2a22">Réessayer</button>';
+      sp.appendChild(d);
+      document.getElementById('spr').onclick = async function () {
+        try {
+          var rs = await navigator.serviceWorker.getRegistrations(); for (var r of rs) await r.unregister();
+          var ks = await caches.keys(); for (var k of ks) await caches.delete(k);
+        } catch (e) { /* ignoré */ }
+        location.reload();
+      };
+    }, 9000);
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
