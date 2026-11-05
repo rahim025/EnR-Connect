@@ -757,3 +757,8 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .version { text-align: center; color: var(--texte2); font-size: .8rem; margin: 6px 0 22px; }
 
 @media (prefers-reduced-motion: reduce) { .choix-reac, .bulle.surligne { animation: none; } }
+
+/* Calme par défaut : plus d'animations sur l'envoi quand la lumière est douce ou éteinte */
+.layout.lum-off .send::before, .layout.lum-doux .send::before,
+.layout.lum-off.ecrit .envoi::before, .layout.lum-doux.ecrit .envoi::before,
+.layout.lum-off.ecrit .ligne-envoi textarea, .layout.lum-doux.ecrit .ligne-envoi textarea { animation: none; }

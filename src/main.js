@@ -907,7 +907,7 @@ function modifierProfil() {
 function envoyerMessage(text, kind = 'text') {
   const data = { uid: state.user.uid, name: nomAffiche(state.user), kind, text, av: monAv(), createdAt: serverTimestamp() };
   if (state.reply) { data.reply = { id: state.reply.id, name: state.reply.name, extrait: state.reply.extrait }; state.reply = null; majContexte(); }
-  addDoc(collection(db, 'messages'), data).catch(console.error); // pas de await : hors ligne, le message reste en attente
+  addDoc(collection(db, 'messages'), data).catch(e => { console.error(e); toast(e && e.code === 'permission-denied' ? 'Envoi refusé par le serveur (règles Firestore).' : 'Message non envoyé.'); }); // pas de await : hors ligne, le message reste en attente
 }
 
 function envoyer() {

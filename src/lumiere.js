@@ -3,7 +3,7 @@
 
 const CLE = 'lumiere';
 export const NIVEAUX = [['intense', 'Intense'], ['doux', 'Doux'], ['off', 'Éteint']];
-export const niveau = () => { try { return localStorage.getItem(CLE) || 'intense'; } catch { return 'intense'; } };
+export const niveau = () => { try { return localStorage.getItem(CLE) || 'off'; } catch { return 'off'; } };
 
 const COUCHES = `
   <i class="mc-vignette"></i>
