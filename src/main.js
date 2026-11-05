@@ -86,12 +86,89 @@ async function signInGoogle() {
   }
 }
 
+
+/* ---------- Lampe à ficelle : il faut tirer la ficelle vers le bas pour allumer / éteindre ---------- */
+let lampeAllumee = false, lampeTimer = 0;
+const MOTIFS = ['vac1', 'vac2', 'vac3'];
+function vaciller(login, motif) {
+  login.classList.remove(...MOTIFS); void login.offsetWidth; login.classList.add(motif);
+}
+function planifierVacillement(login) {
+  clearTimeout(lampeTimer);
+  if (!lampeAllumee || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  lampeTimer = setTimeout(() => {
+    if (!login.isConnected || !login.classList.contains('allume')) return;
+    vaciller(login, Math.random() < 0.6 ? 'vac2' : 'vac1');
+    planifierVacillement(login);
+  }, 6000 + Math.random() * 9000);
+}
+function brancherLampe() {
+  clearTimeout(lampeTimer);
+  const login = document.querySelector('.login'); const f = document.getElementById('ficelle');
+  if (!login || !f) return;
+  planifierVacillement(login);
+  login.addEventListener('animationend', e => { if (e.animationName.startsWith('vac')) login.classList.remove(...MOTIFS); });
+  const regler = on => {
+    lampeAllumee = on; login.classList.toggle('allume', on);
+    f.setAttribute('aria-pressed', on); f.setAttribute('aria-label', on ? 'Éteindre la lampe : tire la ficelle' : 'Allumer la lampe : tire la ficelle');
+    if (on) { if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) vaciller(login, 'vac3'); planifierVacillement(login); }
+    else { clearTimeout(lampeTimer); login.classList.remove(...MOTIFS); }
+  };
+  let y0 = null, dy = 0;
+  const reset = () => { y0 = null; f.classList.remove('tire'); f.style.removeProperty('--tire'); };
+  f.addEventListener('pointerdown', e => { y0 = e.clientY; dy = 0; f.setPointerCapture(e.pointerId); f.classList.add('tire'); });
+  f.addEventListener('pointermove', e => { if (y0 === null) return; dy = Math.max(0, Math.min(e.clientY - y0, 56)); f.style.setProperty('--tire', dy + 'px'); });
+  f.addEventListener('pointerup', () => { if (y0 === null) return; const tire = dy > 26; reset(); if (tire) { if (navigator.vibrate) navigator.vibrate(12); regler(!lampeAllumee); } });
+  f.addEventListener('pointercancel', reset);
+  f.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); regler(!lampeAllumee); } });
+}
+
 function renderLogin(message = '') {
   stopAll();
+  if (message) lampeAllumee = true; // une erreur doit rester visible
   const ins = modePseudo === 'inscription';
+  let nouveau = true; try { nouveau = !localStorage.getItem('deja-connecte'); } catch { /* ignoré */ }
+  const h = new Date().getHours();
+  const [salut, mot] = h >= 5 && h < 12 ? ['Bonjour', 'Belle matinée à toi.']
+    : h >= 12 && h < 14 ? ['Bon midi', 'Profite bien de ta pause.']
+    : h >= 14 && h < 18 ? ['Bon après-midi', 'Content de te voir ici.']
+    : ['Bonsoir', 'Belle soirée à toi.'];
   app.innerHTML = `
-    <main class="login">
-      <div class="sun" aria-hidden="true"></div>
+    <main class="login${lampeAllumee ? ' allume' : ''}${nouveau ? ' nouveau' : ''}">
+      <div class="lampe">
+        <i class="cone" aria-hidden="true"></i>
+        <svg viewBox="0 0 120 112" aria-hidden="true">
+          <defs>
+            <linearGradient id="gAbat" x1="0" x2="1"><stop offset="0" stop-color="#1f5258"/><stop offset=".45" stop-color="#143b40"/><stop offset="1" stop-color="#0a2226"/></linearGradient>
+            <linearGradient id="gLaiton" x1="0" x2="1"><stop offset="0" stop-color="#8a6417"/><stop offset=".4" stop-color="#F0C766"/><stop offset="1" stop-color="#9a6f1b"/></linearGradient>
+            <radialGradient id="gHalo"><stop offset="0" stop-color="#FFE3A8" stop-opacity=".85"/><stop offset=".45" stop-color="#F5A623" stop-opacity=".3"/><stop offset="1" stop-color="#F5A623" stop-opacity="0"/></radialGradient>
+            <radialGradient id="gVerre" cx=".4" cy=".35"><stop offset="0" stop-color="#FFFBEA"/><stop offset=".6" stop-color="#FFE3A8"/><stop offset="1" stop-color="#F5A623"/></radialGradient>
+          </defs>
+          <rect x="53" y="0" width="14" height="5" rx="2" fill="url(#gLaiton)"/>
+          <line x1="60" y1="5" x2="60" y2="30" stroke="#6f8a8c" stroke-width="2"/>
+          <rect x="52" y="30" width="16" height="10" rx="3" fill="url(#gLaiton)"/>
+          <path d="M46 40 H74 C90 40 100 62 106 84 H14 C20 62 30 40 46 40 Z" fill="url(#gAbat)"/>
+          <path d="M44 44 C36 52 29 66 25 82" stroke="#ffffff" stroke-opacity=".14" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <rect x="12" y="84" width="96" height="5" rx="2.5" fill="url(#gLaiton)"/>
+          <circle cx="100" cy="90.5" r="3.4" fill="none" stroke="url(#gLaiton)" stroke-width="1.6"/>
+          <ellipse class="sous-abat" cx="60" cy="87" rx="40" ry="4" fill="#FFE3A8" opacity=".55"/>
+          <circle class="halo" cx="60" cy="94" r="38" fill="url(#gHalo)"/>
+          <rect x="54" y="86" width="12" height="6" rx="2" fill="url(#gLaiton)"/>
+          <circle cx="60" cy="98" r="10" fill="#2c4144" stroke="#4d6568" stroke-width="1"/>
+          <circle class="vive" cx="60" cy="98" r="10" fill="url(#gVerre)"/>
+          <path d="M55 92 Q57 99 60 96 Q63 99 65 92" stroke="#B9801B" stroke-width="1" fill="none" opacity=".7"/>
+        </svg>
+        <div role="button" tabindex="0" class="ficelle" id="ficelle" aria-pressed="${lampeAllumee}" aria-label="${lampeAllumee ? 'Éteindre la lampe : tire la ficelle' : 'Allumer la lampe : tire la ficelle'}"></div>
+        <span class="indice" aria-hidden="true">Tire la ficelle ↓</span>
+      </div>
+      ${nouveau ? `<div class="accueil" aria-live="polite">
+        <b>${salut} !</b>
+        <span>Bienvenue sur EnR Connect, le groupe de la classe d'énergies renouvelables. ${mot}</span>
+        <span class="tire">Tire la ficelle de la lampe pour entrer.</span>
+      </div>` : ''}
+      <div class="obscur" aria-hidden="true"></div>
+      <div class="penombre" aria-hidden="true"></div>
+      <div class="contenu">
       <h1>EnR Connect</h1>
       <p>Le groupe de discussion de la classe d'énergies renouvelables.</p>
       <button class="primary" id="btn-login">Continuer avec Google</button>
@@ -118,7 +195,9 @@ function renderLogin(message = '') {
         <button class="lien" type="button" id="bascule">${ins ? "J'ai déjà un compte" : 'Créer un compte avec un pseudo'}</button>
       </form>
       <p class="msg-erreur" id="err">${esc(message)}</p>
+      </div>
     </main>`;
+  brancherLampe();
   document.getElementById('btn-login').onclick = signInGoogle;
   document.getElementById('pseudo-form').onsubmit = submitPseudo;
   const OEIL = '<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -245,6 +324,7 @@ onAuthStateChanged(auth, async user => {
 async function gererUtilisateur(user) {
   state.user = user;
   if (!user) { arreterNotifs(); return renderLogin(); }
+  try { localStorage.setItem('deja-connecte', '1'); } catch { /* ignoré */ }
   if (!user.emailVerified && !estPseudo(user)) return renderLogin('Utilise un compte Google dont l\'adresse est vérifiée.');
   state.role = await resolveRole(user);
   localStorage.setItem('role:' + mailOf(user), state.role);

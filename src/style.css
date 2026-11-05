@@ -762,3 +762,108 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .layout.lum-off .send::before, .layout.lum-doux .send::before,
 .layout.lum-off.ecrit .envoi::before, .layout.lum-doux.ecrit .envoi::before,
 .layout.lum-off.ecrit .ligne-envoi textarea, .layout.lum-doux.ecrit .ligne-envoi textarea { animation: none; }
+
+/* ---------- Connexion : la lampe à ficelle ---------- */
+@property --tire { syntax: '<length>'; inherits: true; initial-value: 0px; }
+.login > .lampe, .login > .obscur, .login > .contenu { animation: none; }
+.login::before, .login::after { z-index: 0; }
+.login > .obscur { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: var(--nuit); opacity: .97; transition: opacity .6s ease; }
+.login.allume > .obscur { opacity: 0; }
+.login > .contenu {
+  position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding-top: 90px;
+  transition: opacity .7s ease .15s, filter .7s ease .15s, transform .7s ease .15s, visibility 0s;
+}
+.login:not(.allume) > .contenu {
+  opacity: 0; filter: blur(8px); transform: translateY(14px); visibility: hidden; pointer-events: none;
+  transition: opacity .3s ease, filter .3s ease, transform .3s ease, visibility 0s linear .3s;
+}
+.login > .lampe { position: fixed; top: 0; left: 22px; z-index: 5; width: 120px; height: 0; }
+.lampe svg { display: block; width: 120px; height: 112px; overflow: visible; }
+.lampe .vive, .lampe .halo { opacity: 0; transition: opacity .25s ease; }
+.login.allume .lampe .vive, .login.allume .lampe .halo { opacity: 1; }
+.lampe .sous-abat { opacity: 0; transition: opacity .25s ease; }
+.login.allume .lampe .sous-abat { opacity: 1; }
+.lampe .cone {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s ease;
+  background: radial-gradient(ellipse 140% 100% at 82px 98px, #FFE9B8bf 0, #F5A62385 9%, #F5A6233d 28%, #F5A62314 52%, transparent 80%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 84px, #000 112px); mask-image: linear-gradient(180deg, transparent 84px, #000 112px);
+}
+.lampe .cone::after {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-conic-gradient(from 100deg at 82px 98px, #FFE3A82e 0deg 4deg, transparent 4deg 11deg);
+  -webkit-mask-image: radial-gradient(circle at 82px 98px, #000 0, transparent 440px); mask-image: radial-gradient(circle at 82px 98px, #000 0, transparent 440px);
+}
+.login.allume .lampe .cone { opacity: 1; }
+.lampe .ficelle {
+  position: absolute; left: 83px; top: 92px; width: 34px; height: calc(120px + var(--tire, 0px)); padding: 0; background: none; border: 0;
+  cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent;
+}
+.lampe .ficelle::before {
+  content: ""; position: absolute; left: 15px; top: 0; width: 4px; height: calc(80px + var(--tire, 0px)); border-radius: 2px;
+  background:
+    linear-gradient(90deg, #0000008c 0%, #ffffff59 38%, #00000026 62%, #000000a6 100%),
+    repeating-linear-gradient(62deg, #E6CB8E 0 2px, #8f6a2b 2px 4px);
+  filter: drop-shadow(1px 1px 1px #00000080); transition: height .45s cubic-bezier(.3, 1.7, .5, 1);
+}
+.lampe .ficelle::after {
+  content: ""; position: absolute; left: 11px; top: calc(76px + var(--tire, 0px)); width: 12px; height: 22px;
+  border-radius: 38% 38% 50% 50% / 24% 24% 76% 76%;
+  background:
+    linear-gradient(#a9791f, #a9791f) top center / 6px 5px no-repeat,
+    radial-gradient(circle at 35% 40%, #FFE9B5 0%, #F0C766 30%, #B9801B 70%, #7a520f 100%);
+  box-shadow: inset -2px -3px 4px #00000059, inset 2px 2px 3px #ffffff66, 0 2px 4px #00000099;
+  transition: top .45s cubic-bezier(.3, 1.7, .5, 1);
+}
+.lampe .ficelle.tire { cursor: grabbing; }
+.lampe .ficelle.tire::before, .lampe .ficelle.tire::after { transition: none; }
+.lampe, .lampe * { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.lampe .ficelle, .lampe .ficelle:focus, .lampe .ficelle:focus-visible, .lampe .ficelle:active {
+  outline: none; background: transparent; border: 0; box-shadow: none; border-radius: 0; -webkit-appearance: none; appearance: none;
+}
+.lampe .ficelle:focus-visible::after { filter: brightness(1.35); }
+.lampe .indice { position: absolute; left: 128px; top: 118px; width: max-content; font-size: .8rem; color: #9DB7B5; transition: opacity .4s; animation: indice 2.4s ease-in-out infinite; }
+.login.allume .lampe .indice { opacity: 0; animation: none; }
+@keyframes indice { 50% { transform: translateY(5px); } }
+@media (prefers-reduced-motion: reduce) { .lampe .indice { animation: none; } }
+
+/* Vacillements : la lampe grésille comme si elle voulait s'éteindre */
+@keyframes vac1-a { 0% { opacity: 1 } 5% { opacity: 0.15 } 9% { opacity: 1 } 16% { opacity: 0.3 } 20% { opacity: 1 } 44% { opacity: 1 } 48% { opacity: 0 } 51% { opacity: 0.85 } 55% { opacity: 0.05 } 60% { opacity: 1 } 100% { opacity: 1 } }
+@keyframes vac1-o { 0% { opacity: 0.0 } 5% { opacity: 0.77 } 9% { opacity: 0.0 } 16% { opacity: 0.63 } 20% { opacity: 0.0 } 44% { opacity: 0.0 } 48% { opacity: 0.9 } 51% { opacity: 0.14 } 55% { opacity: 0.85 } 60% { opacity: 0.0 } 100% { opacity: 0.0 } }
+@keyframes vac1-c { 0% { filter: brightness(1.0) } 5% { filter: brightness(0.45) } 9% { filter: brightness(1.0) } 16% { filter: brightness(0.54) } 20% { filter: brightness(1.0) } 44% { filter: brightness(1.0) } 48% { filter: brightness(0.35) } 51% { filter: brightness(0.9) } 55% { filter: brightness(0.38) } 60% { filter: brightness(1.0) } 100% { filter: brightness(1.0) } }
+@keyframes vac2-a { 0% { opacity: 1 } 14% { opacity: 0.1 } 28% { opacity: 1 } 42% { opacity: 0.35 } 52% { opacity: 1 } 100% { opacity: 1 } }
+@keyframes vac2-o { 0% { opacity: 0.0 } 14% { opacity: 0.81 } 28% { opacity: 0.0 } 42% { opacity: 0.59 } 52% { opacity: 0.0 } 100% { opacity: 0.0 } }
+@keyframes vac2-c { 0% { filter: brightness(1.0) } 14% { filter: brightness(0.41) } 28% { filter: brightness(1.0) } 42% { filter: brightness(0.58) } 52% { filter: brightness(1.0) } 100% { filter: brightness(1.0) } }
+@keyframes vac3-a { 0% { opacity: 0 } 8% { opacity: 0.9 } 14% { opacity: 0.05 } 22% { opacity: 0.7 } 28% { opacity: 0 } 40% { opacity: 1 } 46% { opacity: 0.2 } 52% { opacity: 1 } 100% { opacity: 1 } }
+@keyframes vac3-o { 0% { opacity: 0.9 } 8% { opacity: 0.09 } 14% { opacity: 0.85 } 22% { opacity: 0.27 } 28% { opacity: 0.9 } 40% { opacity: 0.0 } 46% { opacity: 0.72 } 52% { opacity: 0.0 } 100% { opacity: 0.0 } }
+@keyframes vac3-c { 0% { filter: brightness(0.35) } 8% { filter: brightness(0.94) } 14% { filter: brightness(0.38) } 22% { filter: brightness(0.8) } 28% { filter: brightness(0.35) } 40% { filter: brightness(1.0) } 46% { filter: brightness(0.48) } 52% { filter: brightness(1.0) } 100% { filter: brightness(1.0) } }
+.login.allume.vac1 .lampe .vive, .login.allume.vac1 .lampe .halo, .login.allume.vac1 .lampe .cone { animation: vac1-a 1.6s linear; }
+.login.allume.vac1 > .obscur { animation: vac1-o 1.6s linear; }
+.login.allume.vac1 > .contenu { animation: vac1-c 1.6s linear; }
+.login.allume.vac2 .lampe .vive, .login.allume.vac2 .lampe .halo, .login.allume.vac2 .lampe .cone { animation: vac2-a .9s linear; }
+.login.allume.vac2 > .obscur { animation: vac2-o .9s linear; }
+.login.allume.vac2 > .contenu { animation: vac2-c .9s linear; }
+.login.allume.vac3 .lampe .vive, .login.allume.vac3 .lampe .halo, .login.allume.vac3 .lampe .cone { animation: vac3-a 2.2s linear; }
+.login.allume.vac3 > .obscur { animation: vac3-o 2.2s linear; }
+.login.allume.vac3 > .contenu { animation: vac3-c 2.2s linear; }
+
+/* Le logo ENSET ne s'affiche que sur la messagerie : on le retire de l'écran de connexion */
+.login::after { content: none; display: none; }
+
+/* Message de bienvenue (première connexion, lampe éteinte) */
+.login > .accueil {
+  position: fixed; left: 28px; right: 28px; top: 50%; z-index: 2; display: flex; flex-direction: column; gap: 10px;
+  pointer-events: none; animation: none; transform: translateY(-50%);
+  transition: opacity .35s ease, transform .35s ease, visibility 0s;
+}
+.login > .accueil b { font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; color: #FFE3A8; }
+.login > .accueil span { color: #B9CCCB; max-width: 32ch; line-height: 1.5; }
+.login > .accueil .tire { color: #F5A623; font-weight: 600; }
+.login.allume > .accueil { opacity: 0; transform: translateY(calc(-50% - 14px)); visibility: hidden; transition: opacity .3s ease, transform .3s ease, visibility 0s linear .3s; }
+.login.nouveau .lampe .indice { display: none; }
+
+/* Pénombre : la lumière part de l'ampoule et s'affaiblit avec la distance */
+.login > .penombre {
+  position: fixed; inset: 0; z-index: 3; pointer-events: none; animation: none; opacity: 0; transition: opacity .6s ease;
+  background: radial-gradient(ellipse 170% 110% at 82px 98px, #0B232700 0, #0B232700 30%, #0B23272e 70%, #0B232766 100%);
+}
+.login.allume > .penombre { opacity: 1; }
