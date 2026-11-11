@@ -1,4 +1,5 @@
 :root {
+  --haut: max(env(safe-area-inset-top, 0px), var(--safe-top, 0px));
   --nuit: #0B2327;
   --soleil: #F5A623;
   --aube: #FFE3A8;
@@ -100,7 +101,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 .layout { height: 100%; display: flex; flex-direction: column; }
 .entete {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 8px 6px 8px 14px; padding-top: max(8px, env(safe-area-inset-top));
+  padding: 8px 6px 8px 14px; padding-top: calc(8px + var(--haut));
   background: var(--bg); border-bottom: 1px solid var(--ligne);
 }
 .marque { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -198,7 +199,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 /* ---------- Panneaux (infos du groupe / administration) ---------- */
 .panneau { position: fixed; inset: 0; background: var(--bg); z-index: 10; display: flex; flex-direction: column; }
 .entete-panneau {
-  display: flex; align-items: center; gap: 4px; padding: 8px 12px 8px 6px; padding-top: max(8px, env(safe-area-inset-top));
+  display: flex; align-items: center; gap: 4px; padding: 8px 12px 8px 6px; padding-top: calc(8px + var(--haut));
   background: var(--bg); border-bottom: 1px solid var(--ligne);
 }
 .entete-panneau h2 { font-size: 1.05rem; font-weight: 700; }

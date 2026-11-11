@@ -1,4 +1,8 @@
 import './update.js';
+// Appli Android : la page passe sous la barre d'état, on lit sa hauteur auprès du natif
+try {
+  if (window.EnrInsets) document.documentElement.style.setProperty('--safe-top', window.EnrInsets.haut() + 'px');
+} catch (e) {}
 import * as P from './presence.js';
 import { lancerVisite } from './visite.js';
 import { reglerTheme, theme as themeActuel, THEMES } from './theme.js';
