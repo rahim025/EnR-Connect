@@ -381,7 +381,7 @@ const ICON = {
   gear: S('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
   camera: S('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'),
   megaphone: S('<path d="M3 11v2a1 1 0 0 0 1 1h3l7 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M18 9a4 4 0 0 1 0 6"/>'),
-  send: F('M2 21l21-9L2 3v7l15 2-15 2z'),
+  send: `<svg viewBox=\"0 0 24 24\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4.2 4.6 20.6 12 4.2 19.4 7.6 12z\"/></svg>`,
   like: F('M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z'),
   clock: S('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   image: S('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>'),
@@ -575,15 +575,16 @@ function renderShell() {
       <form class="envoi" id="form">
         <div class="bandeau-contexte" id="contexte" hidden></div>
         <div class="bandeau-annonce" id="bandeau" hidden>${ICON.megaphone}<span>Ce message sera publié comme annonce</span></div>
-        <div class="ligne-envoi">
+        <div class="ligne-envoi"><div class="capsule">
+          <textarea id="texte" rows="1" placeholder="Message" maxlength="2000" aria-label="Message"></textarea>
+          <div class="outils">
           <button type="button" class="icone accent" id="btn-photo" aria-label="Envoyer une photo">${ICON.camera}</button>
           <button type="button" class="icone accent" id="btn-pdf" aria-label="Envoyer un PDF">${ICON.fichier}</button>
           ${admin ? `<button type="button" class="icone accent" id="btn-annonce" aria-label="Publier comme annonce" aria-pressed="false">${ICON.megaphone}</button>` : ''}
-          <textarea id="texte" rows="1" placeholder="Message" maxlength="2000" aria-label="Message"></textarea>
           <button class="send" type="submit" id="btn-send" data-mode="like" aria-label="Envoyer un J'aime">
             <span class="i-like">${ICON.like}</span><span class="i-send">${ICON.send}</span>
           </button>
-        </div>
+        </div></div></div>
       </form>
       <input type="file" id="file" accept="image/*" hidden />
       <input type="file" id="file-pdf" accept="application/pdf" hidden />

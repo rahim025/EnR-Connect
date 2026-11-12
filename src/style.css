@@ -962,3 +962,27 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .menu-joindre .puce:active, .menu-joindre .puce.actif { background: #F5A62326; }
 .menu-joindre .puce svg { box-sizing: content-box; width: 22px; height: 22px; padding: 9px; border-radius: 50%; background: #F5A62326; color: #F5A623; }
 @keyframes pop-menu { from { transform: scale(.9) translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Saisie fusionnée : plus de champ noir séparé, tout est dans la même capsule aux couleurs de l'app */
+.capsule { align-items: center; background: var(--autre); border: 1px solid var(--ligne); padding: 4px 6px; gap: 2px; }
+.capsule .icone { flex: none; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #F5A623; display: grid; place-items: center; }
+.capsule .icone svg { width: 22px; height: 22px; }
+.capsule .icone:active, .capsule .icone[aria-pressed="true"] { background: #F5A62326; }
+.ligne-envoi .capsule textarea, .layout.ecrit .ligne-envoi .capsule textarea { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 10px 8px; color: var(--texte); }
+.capsule textarea::placeholder { color: var(--texte2); }
+
+/* Saisie sur deux étages : le texte en haut, les options en bas, le tout dans une seule boîte */
+.capsule { flex-direction: column; align-items: stretch; gap: 0; border-radius: 22px; padding: 6px 8px 6px 10px; }
+.ligne-envoi .capsule textarea, .layout.ecrit .ligne-envoi .capsule textarea { width: 100%; flex: none; padding: 8px 4px; }
+.capsule .outils { display: flex; align-items: center; gap: 2px; }
+.capsule .outils .send { margin-left: auto; display: grid; place-items: center; }
+.capsule .send[data-mode="like"] .i-like, .capsule .send[data-mode="send"] .i-send { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.capsule .send svg { display: block; }
+
+/* Bouton d'envoi : rond parfait, flèche vers le haut centrée, léger relief doré */
+.ligne-envoi .capsule .send, .layout.ecrit .ligne-envoi .capsule .send { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(180deg, #FFBE45, #F5A623); color: #1B1405; box-shadow: 0 2px 8px #F5A62340, inset 0 1px 0 #ffffff55; }
+.capsule .send svg { width: 20px; height: 20px; }
+.capsule .send[data-mode="like"] .i-like svg { width: 22px; height: 22px; }
+.capsule .send:active { transform: scale(.93); background: #E8890C; }
+
+.capsule .send .i-send svg { transform: translateX(1px); }
