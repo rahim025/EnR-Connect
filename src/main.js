@@ -604,7 +604,7 @@ function renderShell() {
   document.getElementById('form').onsubmit = e => { e.preventDefault(); envoyer(); };
   document.getElementById('btn-photo').onclick = () => document.getElementById('file').click();
   document.getElementById('file').onchange = onPickPhoto;
-  document.getElementById('btn-pdf').onclick = () => document.getElementById('file-pdf').click();
+  document.getElementById('btn-pdf').onclick = () => { pdfDossierImpose = null; document.getElementById('file-pdf').click(); };
   document.getElementById('file-pdf').onchange = onPickPdf;
   document.getElementById('btn-appel').onclick = ouvrirAppel;
   document.getElementById('btn-set').onclick = () => openPanel('settings');
@@ -1091,12 +1091,14 @@ function envoyer() {
 
 /* ---------- PDF (stockés comme les photos : 700 Ko maximum) ---------- */
 const PDF_MAX = 700 * 1024;
+let pdfDossierImpose = null; // {id, nom} quand on ajoute un PDF depuis un dossier
 async function onPickPdf(e) {
+  const impose = pdfDossierImpose; pdfDossierImpose = null;
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
   if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) { toast('Choisis un fichier PDF.'); return; }
   if (file.size > PDF_MAX) { toast('PDF trop lourd : 700 Ko maximum. Réduis-le d\'abord.'); return; }
-  const dossier = await choisirDossier(file.name);
+  const dossier = impose || await choisirDossier(file.name);
   if (dossier === undefined) return; // annulé
   try {
     const data = await new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(file); });
@@ -1108,6 +1110,10 @@ async function onPickPdf(e) {
     addDoc(collection(db, 'messages'), {
       uid: state.user.uid, name: nomAffiche(state.user), kind: 'pdf', mediaId: mref.id, nom, taille, av: monAv(), createdAt: serverTimestamp(),
       ...(dossier ? { dossierId: dossier.id, dossierNom: dossier.nom } : {})
+    }).then(() => {
+      toast(dossier ? 'PDF ajouté dans ' + dossier.nom : 'PDF envoyé');
+      const pn = document.getElementById('panneau');
+      if (dossier && pn && state.panel === 'documents' && pn.dataset.dossier === dossier.id) renderDocuments(pn, dossier.id);
     }).catch(console.error);
   } catch (err) {
     toast('Impossible de préparer ce PDF.');
@@ -1311,7 +1317,11 @@ function renderDocuments(p, ouvert) {
   const d = dossiersListe.find(x => x.id === cur);
   p.innerHTML = `<header class="entete-panneau"><button class="icone" id="retour-doc" aria-label="Retour">${ICON.retour}</button><h2>${esc(d ? d.nom : 'Dossier')}</h2>
     ${admin && d ? `<button class="icone" id="sup-dossier" aria-label="Supprimer le dossier">✕</button>` : ''}</header>
-    <div class="corps" id="liste-pdf"><p class="vide-doc">Chargement…</p></div>`;
+    <div class="corps">
+      <button class="rangee" id="ajout-pdf"><span class="pastille">${ICON.fichier}</span><span class="libelle"><strong>Ajouter un PDF</strong><small>Dans ce dossier${d ? ' : ' + esc(d.nom) : ''}</small></span></button>
+      <div id="liste-pdf"><p class="vide-doc">Chargement…</p></div>
+    </div>`;
+  p.querySelector('#ajout-pdf').onclick = () => { pdfDossierImpose = d ? { id: d.id, nom: d.nom } : null; document.getElementById('file-pdf').click(); };
   p.querySelector('#retour-doc').onclick = () => { p.dataset.dossier = ''; renderDocuments(p); };
   const sup = p.querySelector('#sup-dossier');
   if (sup) sup.onclick = async () => {
