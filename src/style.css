@@ -922,3 +922,43 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .boutons-dialogue .danger-dialogue { background: #E4572E; color: #fff; }
 
 #sup-dossier { margin-left: auto; color: #E4572E; }
+
+/* =====================================================================
+   Barre d'envoi : une seule capsule.
+   « + » à gauche (photo, PDF, annonce dans un petit menu), champ au milieu,
+   bouton rond doré à droite (J'aime, puis Envoyer quand on écrit).
+   ===================================================================== */
+.envoi { position: relative; padding: 8px 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 70%, transparent); }
+.envoi::before, .layout.ecrit .envoi::before { display: none; animation: none; }
+.ligne-envoi { display: block; }
+
+.capsule { display: flex; align-items: flex-end; gap: 2px; padding: 4px; border-radius: 26px; background: var(--autre); border: 1px solid var(--ligne); transition: border-color .2s ease; }
+.capsule:focus-within { border-color: #F5A62399; }
+
+.capsule .plus { position: relative; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #F5A623; display: grid; place-items: center; transition: transform .2s ease, background .2s ease; }
+.capsule .plus svg { width: 24px; height: 24px; }
+.capsule .plus[aria-expanded="true"] { transform: rotate(45deg); background: #F5A62324; }
+.capsule .plus.annonce-on::after { content: ""; position: absolute; top: 5px; right: 5px; width: 10px; height: 10px; border-radius: 50%; background: #F5A623; border: 2px solid var(--autre); }
+
+.ligne-envoi .capsule textarea,
+.layout.ecrit .ligne-envoi .capsule textarea {
+  flex: 1; min-width: 0; margin: 0; height: 40px; min-height: 40px; max-height: 120px; padding: 10px 6px;
+  border: 0; border-radius: 0; background: transparent; box-shadow: none; animation: none; outline: 0; font-size: 1rem;
+}
+.ligne-envoi .capsule textarea:focus-visible { outline: 0; box-shadow: none; }
+
+.ligne-envoi .capsule .send,
+.layout.ecrit .ligne-envoi .capsule .send { flex: none; width: 40px; height: 40px; margin: 0; background: #F5A623; color: #1B1405; box-shadow: none; animation: none; transition: transform .15s ease, background .2s ease; }
+.capsule .send::before, .capsule .send[data-mode="send"]::before { display: none; animation: none; }
+.capsule .send:active { background: #E8890C; transform: scale(.92); }
+.capsule .send svg { width: 22px; height: 22px; }
+.capsule .send[data-mode="send"] .i-send { animation: bascule .22s ease-out; }
+@keyframes bascule { from { transform: scale(.5) rotate(-35deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Petit menu qui s'ouvre au-dessus du « + » */
+.menu-joindre { position: absolute; left: 10px; bottom: calc(100% - 4px); z-index: 30; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 18px; background: var(--surface2, #17353A); border: 1px solid var(--ligne); transform-origin: bottom left; animation: pop-menu .16s ease-out; }
+.menu-joindre[hidden] { display: none; }
+.menu-joindre .puce { display: flex; align-items: center; gap: 12px; border: 0; background: transparent; color: var(--texte); font: inherit; font-size: .98rem; padding: 6px 16px 6px 6px; border-radius: 14px; cursor: pointer; text-align: left; }
+.menu-joindre .puce:active, .menu-joindre .puce.actif { background: #F5A62326; }
+.menu-joindre .puce svg { box-sizing: content-box; width: 22px; height: 22px; padding: 9px; border-radius: 50%; background: #F5A62326; color: #F5A623; }
+@keyframes pop-menu { from { transform: scale(.9) translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
