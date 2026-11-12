@@ -4,11 +4,12 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function mail()     { return request.auth.token.email.lower(); }
-    function isAdmin()  { return signedIn() && exists(/databases/$(db)/documents/admins/$(mail())); }
+    function isAdmin()  { return signedIn() && (exists(/databases/$(db)/documents/admins/$(mail())) || exists(/databases/$(db)/documents/createurs/$(mail()))); }
     function isMember() { return signedIn() && (isAdmin() || exists(/databases/$(db)/documents/allowed/$(mail()))); }
 
     // Chaque utilisateur peut seulement vérifier sa propre ligne
-    match /admins/{e}  { allow get: if signedIn() && mail() == e; }
+    match /admins/{e}    { allow get: if signedIn() && mail() == e; }
+    match /createurs/{e} { allow get: if signedIn() && mail() == e; }
     match /allowed/{e} {
       allow get:    if signedIn() && (mail() == e || isAdmin());
       allow list:   if isAdmin();
