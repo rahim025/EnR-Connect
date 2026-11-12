@@ -1240,6 +1240,51 @@ function choisirDossier(nomFichier) {
   });
 }
 
+
+/* Fenêtres aux couleurs de l'appli (remplacent les boîtes grises d'Android) */
+function demanderNom(titre, indice) {
+  return new Promise(fin => {
+    const fond = document.createElement('div');
+    fond.className = 'choix-dossier centre';
+    fond.innerHTML = `<div class="boite">
+      <h3>${esc(titre)}</h3>
+      <input type="text" class="champ-dialogue" maxlength="40" placeholder="${esc(indice || '')}" autocomplete="off" />
+      <div class="boutons-dialogue">
+        <button type="button" class="annuler" data-a="1">Annuler</button>
+        <button type="button" class="primary valider" disabled>Créer</button>
+      </div>
+    </div>`;
+    document.body.appendChild(fond);
+    const champ = fond.querySelector('.champ-dialogue');
+    const ok = fond.querySelector('.valider');
+    const clore = v => { fond.remove(); fin(v); };
+    champ.oninput = () => { ok.disabled = !champ.value.trim(); };
+    champ.onkeydown = e => { if (e.key === 'Enter' && champ.value.trim()) clore(champ.value.trim().slice(0, 40)); };
+    ok.onclick = () => clore(champ.value.trim().slice(0, 40));
+    fond.onclick = e => { if (e.target === fond || e.target.closest('[data-a]')) clore(null); };
+    setTimeout(() => champ.focus(), 50);
+  });
+}
+
+function confirmerAction(titre, texte, libelle) {
+  return new Promise(fin => {
+    const fond = document.createElement('div');
+    fond.className = 'choix-dossier centre';
+    fond.innerHTML = `<div class="boite">
+      <h3>${esc(titre)}</h3>
+      <p class="petit">${esc(texte)}</p>
+      <div class="boutons-dialogue">
+        <button type="button" class="annuler" data-a="1">Annuler</button>
+        <button type="button" class="primary valider danger-dialogue">${esc(libelle || 'Confirmer')}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(fond);
+    const clore = v => { fond.remove(); fin(v); };
+    fond.querySelector('.valider').onclick = () => clore(true);
+    fond.onclick = e => { if (e.target === fond || e.target.closest('[data-a]')) clore(false); };
+  });
+}
+
 function renderDocuments(p, ouvert) {
   const admin = estAdmin();
   const cur = ouvert || p.dataset.dossier || '';
@@ -1256,7 +1301,7 @@ function renderDocuments(p, ouvert) {
     p.querySelectorAll('[data-d]').forEach(b => b.onclick = () => renderDocuments(p, b.dataset.d));
     const nv = p.querySelector('#nv-dossier');
     if (nv) nv.onclick = async () => {
-      const nom = (prompt('Nom du dossier (matière) :') || '').trim().slice(0, 40);
+      const nom = await demanderNom('Nouveau dossier', 'Nom de la matière, ex. Thermodynamique');
       if (!nom) return;
       try { await addDoc(collection(db, 'dossiers'), { nom, uid: state.user.uid, createdAt: serverTimestamp() }); }
       catch (e) { console.error(e); toast('Dossier non créé (règles Firestore à publier).'); }
@@ -1270,7 +1315,7 @@ function renderDocuments(p, ouvert) {
   p.querySelector('#retour-doc').onclick = () => { p.dataset.dossier = ''; renderDocuments(p); };
   const sup = p.querySelector('#sup-dossier');
   if (sup) sup.onclick = async () => {
-    if (!confirm('Supprimer ce dossier ? Les PDF restent dans le fil de discussion.')) return;
+    if (!(await confirmerAction('Supprimer ce dossier ?', 'Les PDF restent dans le fil de discussion.', 'Supprimer'))) return;
     try { await deleteDoc(doc(db, 'dossiers', cur)); } catch (e) { console.error(e); toast('Suppression refusée.'); return; }
     p.dataset.dossier = ''; renderDocuments(p);
   };

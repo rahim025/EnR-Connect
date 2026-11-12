@@ -910,3 +910,13 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .vide-doc { padding: 24px 16px; text-align: center; }
 
 #btn-docs { position: relative; color: #F5A623; }
+
+/* Fenêtres de dialogue au centre (nom de dossier, confirmation) */
+.choix-dossier.centre { align-items: center; padding: 0 20px; }
+.choix-dossier.centre .boite { border-radius: 20px; padding: 20px 18px 16px; border: 1px solid #F5A62333; box-shadow: 0 12px 40px rgba(0, 0, 0, .5); }
+.champ-dialogue { font: inherit; font-size: 1rem; color: var(--texte); background: var(--surface2); border: 1px solid transparent; border-radius: 12px; padding: 12px 14px; outline: none; }
+.champ-dialogue:focus { border-color: #F5A623; }
+.boutons-dialogue { display: flex; gap: 10px; margin-top: 6px; }
+.boutons-dialogue button { flex: 1; font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 12px; cursor: pointer; }
+.boutons-dialogue .primary:disabled { opacity: .4; }
+.boutons-dialogue .danger-dialogue { background: #E4572E; color: #fff; }
