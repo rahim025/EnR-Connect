@@ -365,6 +365,7 @@ async function gererUtilisateur(user) {
 const S = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const F = d => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
 const ICON = {
+  dossier: S('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
   fichier: S('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/>'),
   telephone: S('<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>'),
   retour: S('<path d="M15 5l-7 7 7 7"/>'),
@@ -494,6 +495,7 @@ function arreterNotifs() { if (NATIF) Watcher.stop().catch(() => {}); }
 
 /* ---------- Discussion ---------- */
 function stopAll() {
+  if (dossiersUnsub) { dossiersUnsub(); dossiersUnsub = null; }
   P.arreter();
   unsubs.forEach(u => u()); unsubs = [];
   timers.forEach(clearInterval); timers = [];
@@ -522,6 +524,7 @@ function startChat() {
   renderShell();
   subscribeMessages();
   chargerEpingle();
+  ecouterDossiers();
   chargerMonProfil();
   demarrerNotifs();
   setTimeout(() => lancerVisite({ uid: state.user.uid, admin: estAdmin() }), 700);
@@ -561,6 +564,7 @@ function renderShell() {
           </div>
         </div>
         <div class="actions-entete">
+          <button class="icone" id="btn-docs" aria-label="Documents par matière">${ICON.dossier}</button>
           <button class="icone" id="btn-appel" aria-label="Appel de groupe">${ICON.telephone}</button>
           <button class="icone" id="btn-search" aria-label="Rechercher dans les messages">${ICON.recherche}</button>
           ${admin ? `<button class="icone" id="btn-admin" aria-label="Administration">${ICON.shield}</button>` : ''}
@@ -607,6 +611,7 @@ function renderShell() {
   document.getElementById('btn-appel').onclick = ouvrirAppel;
   document.getElementById('btn-set').onclick = () => openPanel('settings');
   document.getElementById('btn-search').onclick = () => openPanel('search');
+  document.getElementById('btn-docs').onclick = () => openPanel('documents');
   const ba = document.getElementById('btn-admin'); if (ba) ba.onclick = () => openPanel('admin');
   const bn = document.getElementById('btn-annonce');
   if (bn) bn.onclick = () => { state.announce = !state.announce; majAnnonce(); };
@@ -681,7 +686,7 @@ function contenuHTML(m) {
     return `<button class="media-masque" data-media="${esc(m.mediaId)}">${ICON.image}<span><strong>Photo masquée</strong><small>${m.taille ? m.taille + ' Ko · ' : ''}Appuie pour charger</small></span></button>`;
   }
   if (m.kind === 'pdf') {
-    return `<button type="button" class="fichier-pdf" data-pdf="${esc(m.mediaId)}" data-nom="${esc(m.nom || 'document.pdf')}">${ICON.fichier}<span><strong>${esc(m.nom || 'Document PDF')}</strong><small>PDF${m.taille ? ' · ' + m.taille + ' Ko' : ''} · Appuie pour ouvrir</small></span></button>`;
+    return `<button type="button" class="fichier-pdf" data-pdf="${esc(m.mediaId)}" data-nom="${esc(m.nom || 'document.pdf')}">${ICON.fichier}<span><strong>${esc(m.nom || 'Document PDF')}</strong><small>${m.dossierNom ? esc(m.dossierNom) + ' · ' : ''}PDF${m.taille ? ' · ' + m.taille + ' Ko' : ''} · Appuie pour ouvrir</small></span></button>`;
   }
   return `<div class="texte">${lierURL(esc(m.text)).replace(/\n/g, '<br>')}${m.editedAt ? '<span class="modifie">modifié</span>' : ''}</div>`;
 }
@@ -757,16 +762,24 @@ function ligneHTML(x, debut, fin) {
 const accueilVu = uid => { try { return localStorage.getItem('accueil-vu:' + uid) === '1'; } catch { return false; } };
 function afficherAccueilGroupe(uid, suite) {
   stopAll();
-  app.innerHTML = `<main class="ecran-accueil">${accueilGroupeHTML()}
-    <button class="primary" id="btn-compris">J'ai compris</button></main>`;
-  document.getElementById('btn-compris').onclick = () => {
+  app.innerHTML = `<main class="ecran-accueil">
+    <div class="accueil-defil">${accueilGroupeHTML()}</div>
+    <div class="accueil-bas">
+      <label class="accueil-case"><input type="checkbox" id="case-lu"><span>J'ai fini de lire et je comprends</span></label>
+      <button class="primary" id="btn-compris" disabled>J'ai compris</button>
+    </div></main>`;
+  const caseLu = document.getElementById('case-lu');
+  const btn = document.getElementById('btn-compris');
+  caseLu.onchange = () => { btn.disabled = !caseLu.checked; };
+  btn.onclick = () => {
+    if (!caseLu.checked) return;
     try { localStorage.setItem('accueil-vu:' + uid, '1'); } catch { /* ignoré */ }
     suite();
   };
 }
 function accueilGroupeHTML() {
   return `<section class="bienvenue-groupe" aria-label="Bienvenue dans le groupe">
-    <span class="avatar-groupe grand"><span class="logo grand"></span></span>
+    <div class="logo-ecole" role="img" aria-label="Logo de l'école"></div>
     <h2>Bienvenue dans EnR Connect</h2>
     <p class="sous">Le groupe réservé uniquement à la filière ER1 (énergies renouvelables), 1ère année.</p>
     <h3>Pourquoi ce groupe ?</h3>
@@ -1085,6 +1098,8 @@ async function onPickPdf(e) {
   if (!file) return;
   if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) { toast('Choisis un fichier PDF.'); return; }
   if (file.size > PDF_MAX) { toast('PDF trop lourd : 700 Ko maximum. Réduis-le d\'abord.'); return; }
+  const dossier = await choisirDossier(file.name);
+  if (dossier === undefined) return; // annulé
   try {
     const data = await new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(file); });
     const nom = file.name.slice(0, 80);
@@ -1093,7 +1108,8 @@ async function onPickPdf(e) {
     mediaCache.set(mref.id, data);
     setDoc(mref, { uid: state.user.uid, data, kind: 'pdf', nom, createdAt: serverTimestamp() }).catch(console.error);
     addDoc(collection(db, 'messages'), {
-      uid: state.user.uid, name: nomAffiche(state.user), kind: 'pdf', mediaId: mref.id, nom, taille, av: monAv(), createdAt: serverTimestamp()
+      uid: state.user.uid, name: nomAffiche(state.user), kind: 'pdf', mediaId: mref.id, nom, taille, av: monAv(), createdAt: serverTimestamp(),
+      ...(dossier ? { dossierId: dossier.id, dossierNom: dossier.nom } : {})
     }).catch(console.error);
   } catch (err) {
     toast('Impossible de préparer ce PDF.');
@@ -1185,6 +1201,92 @@ async function onPickPhoto(e) {
   }
 }
 
+
+/* ---------- Documents rangés par matière (dossiers créés par les administrateurs) ---------- */
+let dossiersListe = [];
+let dossiersUnsub = null;
+function ecouterDossiers() {
+  if (dossiersUnsub) return;
+  dossiersUnsub = onSnapshot(query(collection(db, 'dossiers'), orderBy('nom')), snap => {
+    dossiersListe = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const pn = document.getElementById('panneau');
+    if (pn && state.panel === 'documents') renderDocuments(pn);
+  }, err => console.error(err));
+}
+
+/* Fenêtre de choix du dossier au moment d'envoyer un PDF. Renvoie {id, nom}, null (sans dossier) ou undefined (annulé). */
+function choisirDossier(nomFichier) {
+  return new Promise(fin => {
+    const fond = document.createElement('div');
+    fond.className = 'choix-dossier';
+    const lignes = dossiersListe.map(d => `<button type="button" class="rangee" data-d="${esc(d.id)}"><span class="pastille">${ICON.dossier}</span><span class="libelle"><strong>${esc(d.nom)}</strong></span></button>`).join('');
+    fond.innerHTML = `<div class="boite">
+      <h3>Dans quel dossier ranger ce PDF ?</h3>
+      <p class="petit">${esc(nomFichier)}</p>
+      <div class="liste-dossiers">${lignes || '<p class="petit">Aucun dossier pour le moment. Un administrateur peut en créer dans Documents.</p>'}</div>
+      <button type="button" class="rangee" data-d="">Envoyer sans dossier</button>
+      <button type="button" class="annuler" data-a="1">Annuler</button>
+    </div>`;
+    document.body.appendChild(fond);
+    fond.onclick = ev => {
+      const b = ev.target.closest('button'); 
+      if (ev.target === fond) { fond.remove(); fin(undefined); return; }
+      if (!b) return;
+      if (b.dataset.a) { fond.remove(); fin(undefined); return; }
+      const id = b.dataset.d;
+      fond.remove();
+      if (!id) { fin(null); return; }
+      const d = dossiersListe.find(x => x.id === id);
+      fin(d ? { id: d.id, nom: d.nom } : null);
+    };
+  });
+}
+
+function renderDocuments(p, ouvert) {
+  const admin = estAdmin();
+  const cur = ouvert || p.dataset.dossier || '';
+  p.dataset.dossier = cur;
+  if (!cur) {
+    p.innerHTML = `${enteteHTML('Documents')}
+      <div class="corps">
+        ${admin ? `<button class="rangee" id="nv-dossier"><span class="pastille">${ICON.dossier}</span><span class="libelle"><strong>Créer un dossier</strong><small>Une matière, par exemple Thermodynamique</small></span></button>` : ''}
+        <h3 class="titre-section">Matières</h3>
+        ${dossiersListe.length ? dossiersListe.map(d => `<button class="rangee" data-d="${esc(d.id)}"><span class="pastille">${ICON.dossier}</span><span class="libelle"><strong>${esc(d.nom)}</strong></span><span class="fleche">${ICON.chevron}</span></button>`).join('')
+          : '<p class="vide-doc">Aucun dossier pour le moment.</p>'}
+      </div>`;
+    p.querySelector('#close').onclick = closePanel;
+    p.querySelectorAll('[data-d]').forEach(b => b.onclick = () => renderDocuments(p, b.dataset.d));
+    const nv = p.querySelector('#nv-dossier');
+    if (nv) nv.onclick = async () => {
+      const nom = (prompt('Nom du dossier (matière) :') || '').trim().slice(0, 40);
+      if (!nom) return;
+      try { await addDoc(collection(db, 'dossiers'), { nom, uid: state.user.uid, createdAt: serverTimestamp() }); }
+      catch (e) { console.error(e); toast('Dossier non créé (règles Firestore à publier).'); }
+    };
+    return;
+  }
+  const d = dossiersListe.find(x => x.id === cur);
+  p.innerHTML = `<header class="entete-panneau"><button class="icone" id="retour-doc" aria-label="Retour">${ICON.retour}</button><h2>${esc(d ? d.nom : 'Dossier')}</h2>
+    ${admin && d ? `<button class="icone" id="sup-dossier" aria-label="Supprimer le dossier">✕</button>` : ''}</header>
+    <div class="corps" id="liste-pdf"><p class="vide-doc">Chargement…</p></div>`;
+  p.querySelector('#retour-doc').onclick = () => { p.dataset.dossier = ''; renderDocuments(p); };
+  const sup = p.querySelector('#sup-dossier');
+  if (sup) sup.onclick = async () => {
+    if (!confirm('Supprimer ce dossier ? Les PDF restent dans le fil de discussion.')) return;
+    try { await deleteDoc(doc(db, 'dossiers', cur)); } catch (e) { console.error(e); toast('Suppression refusée.'); return; }
+    p.dataset.dossier = ''; renderDocuments(p);
+  };
+  getDocs(query(collection(db, 'messages'), where('dossierId', '==', cur))).then(snap => {
+    const zone = p.querySelector('#liste-pdf'); if (!zone) return;
+    const pdfs = snap.docs.map(x => ({ id: x.id, ...x.data() })).filter(m => m.kind === 'pdf')
+      .sort((a, b) => (dateDe(b) || 0) - (dateDe(a) || 0));
+    zone.innerHTML = pdfs.length
+      ? pdfs.map(m => `<button type="button" class="rangee fichier-pdf" data-pdf="${esc(m.mediaId)}" data-nom="${esc(m.nom || 'document.pdf')}"><span class="pastille">${ICON.fichier}</span><span class="libelle"><strong>${esc(m.nom || 'Document PDF')}</strong><small>${esc(m.name || '')} · ${esc(etiquette(dateDe(m)))}${m.taille ? ' · ' + m.taille + ' Ko' : ''}</small></span></button>`).join('')
+      : '<p class="vide-doc">Aucun document dans ce dossier.</p>';
+    zone.querySelectorAll('[data-pdf]').forEach(b => b.onclick = () => ouvrirPdf(b.dataset.pdf, b.dataset.nom));
+  }).catch(e => { console.error(e); const z = p.querySelector('#liste-pdf'); if (z) z.innerHTML = '<p class="vide-doc">Impossible de charger les documents.</p>'; });
+}
+
 /* ---------- Panneaux : infos du groupe (réglages) et administration ---------- */
 function openPanel(which) {
   closePanel();
@@ -1195,6 +1297,7 @@ function openPanel(which) {
   if (which === 'settings') renderSettings(p);
   else if (which === 'search') renderRecherche(p);
   else if (which === 'about') renderAbout(p);
+  else if (which === 'documents') renderDocuments(p);
   else renderAdmin(p);
 }
 

@@ -887,8 +887,26 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .fichier-pdf small { display: block; opacity: .75; font-size: .78rem; }
 .dialogue .boutons.appel { flex-wrap: wrap; }
 
-/* Écran de bienvenue (première connexion) : défilable, bouton « J'ai compris » en bas */
-.ecran-accueil { box-sizing: border-box; min-height: 100%; max-height: 100dvh; overflow-y: auto; padding: 18px 14px calc(22px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; background: var(--bg); }
+/* Écran de bienvenue (première connexion) : texte défilable, case + bouton fixes en bas */
+.ecran-accueil { box-sizing: border-box; height: 100dvh; display: flex; flex-direction: column; background: var(--bg); padding-top: var(--haut); }
+.ecran-accueil .accueil-defil { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 14px 10px; }
 .ecran-accueil .bienvenue-groupe { margin: 0; }
-.ecran-accueil .primary { position: sticky; bottom: 0; width: 100%; padding: 14px; font-size: 1.05rem; border: 0; border-radius: 14px; }
+.ecran-accueil .accueil-bas { flex: none; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid #F5A62333; }
+.ecran-accueil .accueil-case { display: flex; align-items: center; gap: 10px; color: var(--texte); font-size: .95rem; cursor: pointer; }
+.ecran-accueil .accueil-case input { width: 22px; height: 22px; flex: none; accent-color: #F5A623; }
+.ecran-accueil .primary { width: 100%; padding: 14px; font-size: 1.05rem; border: 0; border-radius: 14px; transition: opacity .2s ease; }
+.ecran-accueil .primary:disabled { opacity: .4; }
+.logo-ecole { width: 120px; height: 120px; margin: 0 auto 10px; background: url('./assets/enset-logo.webp') center / contain no-repeat; }
 .login > .accueil .mot { color: #FFE3A8; font-size: 1.05rem; }
+
+
+/* Documents par matière */
+.choix-dossier { position: fixed; inset: 0; z-index: 120; background: rgba(5, 18, 20, .72); display: flex; align-items: flex-end; justify-content: center; }
+.choix-dossier .boite { box-sizing: border-box; width: 100%; max-width: 480px; max-height: 80dvh; overflow-y: auto; padding: 18px 14px calc(16px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; background: var(--bg); color: var(--texte); display: flex; flex-direction: column; gap: 8px; }
+.choix-dossier h3 { margin: 0; font-size: 1.05rem; }
+.choix-dossier .petit, .vide-doc { margin: 0; font-size: .88rem; color: var(--texte2); }
+.choix-dossier .liste-dossiers { display: flex; flex-direction: column; }
+.choix-dossier .annuler { font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 12px; background: var(--surface2, #ffffff14); color: var(--texte); cursor: pointer; }
+.vide-doc { padding: 24px 16px; text-align: center; }
+
+#btn-docs { position: relative; color: #F5A623; }
