@@ -4,7 +4,6 @@ try {
   if (window.EnrInsets) document.documentElement.style.setProperty('--safe-top', window.EnrInsets.haut() + 'px');
 } catch (e) {}
 import * as P from './presence.js';
-import { lancerVisite } from './visite.js';
 import { reglerTheme, theme as themeActuel, THEMES } from './theme.js';
 import { monterFicelle } from './ficelle.js';
 import { monterLumiere, reglerNiveau, niveau as niveauLumiere, NIVEAUX as NIVEAUX_LUMIERE } from './lumiere.js';
@@ -527,7 +526,6 @@ function startChat() {
   ecouterDossiers();
   chargerMonProfil();
   demarrerNotifs();
-  setTimeout(() => lancerVisite({ uid: state.user.uid, admin: estAdmin() }), 700);
   P.demarrer({ db, uid: state.user.uid, nom: nomAffiche(state.user), role: state.role, onChange: majPresenceUI });
 }
 
@@ -1383,11 +1381,6 @@ function renderSettings(p) {
         <span class="libelle"><strong>À propos et règles du groupe</strong><small>Version de l'appli et bonnes pratiques</small></span>
         <span class="fleche">${ICON.chevron}</span>
       </button>
-      <button class="rangee" id="revoir-visite">
-        <span class="pastille">${ICON.megaphone}</span>
-        <span class="libelle"><strong>Revoir la visite guidée</strong><small>Explique chaque partie de l'écran et son rôle</small></span>
-        <span class="fleche">${ICON.chevron}</span>
-      </button>
 
       <h3 class="titre-section">Compte</h3>
       <div class="rangee statique">
@@ -1417,7 +1410,6 @@ function renderSettings(p) {
   p.querySelector('#theme').onchange = ev => reglerTheme(ev.target.value);
   p.querySelector('#mon-profil').onclick = () => modifierProfil();
   p.querySelector('#a-propos').onclick = () => openPanel('about');
-  p.querySelector('#revoir-visite').onclick = () => { closePanel(); setTimeout(() => lancerVisite({ uid: state.user.uid, admin, force: true }), 350); };
   p.querySelector('#logout').onclick = () => { closePanel(); arreterNotifs(); P.arreter(); signOut(auth); };
 }
 
