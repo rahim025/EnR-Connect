@@ -30,6 +30,12 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isMember() && resource.data.uid == request.auth.uid);
     }
 
+    match /dossiers/{id} {
+      allow read:   if isMember();
+      allow create: if isAdmin() && request.resource.data.nom is string && request.resource.data.nom.size() <= 40;
+      allow update, delete: if isAdmin();
+    }
+
     match /users/{uid} {
       allow read:   if isMember();
       allow create, update: if isMember() && request.auth.uid == uid;
