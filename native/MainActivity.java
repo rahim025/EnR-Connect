@@ -2,7 +2,9 @@ package com.enrconnect.app;
 
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.WindowManager;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
@@ -42,7 +44,16 @@ public class MainActivity extends BridgeActivity {
     /** L'appli passe sous la barre d'état (en haut), comme Messenger. */
     private void activerPleinEcran() {
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
+        // Écrans à encoche / trou de caméra : sans ça Android peint la zone du haut en noir
+        if (Build.VERSION.SDK_INT >= 28) {
+            WindowManager.LayoutParams wlp = getWindow().getAttributes();
+            wlp.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(wlp);
+        }
 
         boolean nuit = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
                 == Configuration.UI_MODE_NIGHT_YES;
