@@ -986,3 +986,6 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .capsule .send:active { transform: scale(.93); background: #E8890C; }
 
 .capsule .send .i-send svg { transform: translateX(1px); }
+
+/* Le bouton d'envoi reste toujours à droite, même pendant la frappe (.ecrit) */
+.layout .ligne-envoi .capsule .outils .send, .layout.ecrit .ligne-envoi .capsule .outils .send { margin: 0 0 0 auto; }
