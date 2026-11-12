@@ -16,5 +16,8 @@
     "allowNavigation": [
       "rahim025.github.io"
     ]
+  },
+  "android": {
+    "adjustMarginsForEdgeToEdge": "disable"
   }
 }
