@@ -16,7 +16,7 @@ import {
 } from 'firebase/auth';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, onSnapshot,
-  query, orderBy, limit, where, serverTimestamp, disableNetwork, enableNetwork, updateDoc, arrayUnion, arrayRemove
+  query, orderBy, limit, where, serverTimestamp, disableNetwork, enableNetwork, updateDoc, arrayUnion, arrayRemove, writeBatch
 } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -1090,27 +1090,46 @@ function envoyer() {
   state.announce = false; majAnnonce(); majBoutonEnvoi();
 }
 
-/* ---------- PDF (stockés comme les photos : 700 Ko maximum) ---------- */
-const PDF_MAX = 700 * 1024;
+/* ---------- PDF (découpés en morceaux de 700 Ko dans Firestore : 3 Mo maximum) ---------- */
+const PDF_MAX = 3 * 1024 * 1024;
+const MORCEAU = 700000; // caractères par document Firestore (limite : 1 Mo)
+const TYPES_DOC = ['Épreuve', 'TD', 'Cours', 'Corrigé'];
 let pdfDossierImpose = null; // {id, nom} quand on ajoute un PDF depuis un dossier
 async function onPickPdf(e) {
   const impose = pdfDossierImpose; pdfDossierImpose = null;
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
   if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) { toast('Choisis un fichier PDF.'); return; }
-  if (file.size > PDF_MAX) { toast('PDF trop lourd : 700 Ko maximum. Réduis-le d\'abord.'); return; }
+  if (file.size > PDF_MAX) { toast('PDF trop lourd : 3 Mo maximum. Réduis-le d\'abord.'); return; }
   const dossier = impose || await choisirDossier(file.name);
   if (dossier === undefined) return; // annulé
+  let details = {};
+  if (dossier) {
+    const d = await choisirDetails(file.name);
+    if (d === undefined) return; // annulé
+    details = d;
+  }
   try {
     const data = await new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(file); });
     const nom = file.name.slice(0, 80);
     const taille = Math.max(1, Math.round(file.size / 1024));
     const mref = doc(collection(db, 'media'));
+    const morceaux = [];
+    for (let i = 0; i < data.length; i += MORCEAU) morceaux.push(data.slice(i, i + MORCEAU));
     mediaCache.set(mref.id, data);
-    setDoc(mref, { uid: state.user.uid, data, kind: 'pdf', nom, createdAt: serverTimestamp() }).catch(console.error);
+    const lot = writeBatch(db);
+    morceaux.forEach((part, i) => {
+      const ref = i === 0 ? mref : doc(db, 'media', mref.id + '_' + i);
+      lot.set(ref, i === 0
+        ? { uid: state.user.uid, data: part, kind: 'pdf', nom, n: morceaux.length, createdAt: serverTimestamp() }
+        : { uid: state.user.uid, data: part, kind: 'pdf-part', createdAt: serverTimestamp() });
+    });
+    lot.commit().catch(e => { console.error(e); toast('PDF non enregistré.'); });
     addDoc(collection(db, 'messages'), {
-      uid: state.user.uid, name: nomAffiche(state.user), kind: 'pdf', mediaId: mref.id, nom, taille, av: monAv(), createdAt: serverTimestamp(),
-      ...(dossier ? { dossierId: dossier.id, dossierNom: dossier.nom } : {})
+      uid: state.user.uid, name: nomAffiche(state.user), kind: 'pdf', mediaId: mref.id, nom, taille, n: morceaux.length, av: monAv(), createdAt: serverTimestamp(),
+      ...(dossier ? { dossierId: dossier.id, dossierNom: dossier.nom } : {}),
+      ...(details.typeDoc ? { typeDoc: details.typeDoc } : {}),
+      ...(details.annee ? { annee: details.annee } : {})
     }).then(() => {
       toast(dossier ? 'PDF ajouté dans ' + dossier.nom : 'PDF envoyé');
       const pn = document.getElementById('panneau');
@@ -1127,7 +1146,15 @@ async function ouvrirPdf(id, nom) {
       toast('Chargement du PDF…');
       const snap = await getDoc(doc(db, 'media', id));
       if (!snap.exists()) { toast('PDF introuvable.'); return; }
-      mediaCache.set(id, snap.data().data);
+      const premier = snap.data();
+      let data = premier.data;
+      const n = premier.n || 1;
+      if (n > 1) {
+        const suite = await Promise.all(Array.from({ length: n - 1 }, (_, i) => getDoc(doc(db, 'media', id + '_' + (i + 1)))));
+        if (suite.some(x => !x.exists())) { toast('PDF incomplet, réessaie.'); return; }
+        data += suite.map(x => x.data().data).join('');
+      }
+      mediaCache.set(id, data);
     }
     const [, b64] = String(mediaCache.get(id)).split(',');
     const bin = atob(b64); const oct = new Uint8Array(bin.length);
@@ -1248,6 +1275,36 @@ function choisirDossier(nomFichier) {
 }
 
 
+/* Fenêtre : type de document et année, pour ranger les épreuves */
+function choisirDetails(nomFichier) {
+  return new Promise(fin => {
+    const fond = document.createElement('div');
+    fond.className = 'choix-dossier centre';
+    const annee = new Date().getFullYear();
+    fond.innerHTML = `<div class="boite">
+      <h3>De quel type de document s'agit-il ?</h3>
+      <p class="petit">${esc(nomFichier)}</p>
+      <div class="choix-type">${TYPES_DOC.map(t => `<button type="button" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <input type="text" class="champ-dialogue" maxlength="9" inputmode="numeric" placeholder="Année, ex. ${annee - 1}-${annee}" autocomplete="off" />
+      <div class="boutons-dialogue">
+        <button type="button" class="annuler" data-a="1">Annuler</button>
+        <button type="button" class="primary valider">Ajouter</button>
+      </div>
+    </div>`;
+    document.body.appendChild(fond);
+    let type = '';
+    const champ = fond.querySelector('.champ-dialogue');
+    const clore = v => { fond.remove(); fin(v); };
+    fond.querySelector('.choix-type').onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      type = type === b.dataset.t ? '' : b.dataset.t;
+      fond.querySelectorAll('.choix-type button').forEach(x => x.classList.toggle('on', x.dataset.t === type));
+    };
+    fond.querySelector('.valider').onclick = () => clore({ typeDoc: type, annee: champ.value.trim().slice(0, 9) });
+    fond.onclick = e => { if (e.target === fond || e.target.closest('[data-a]')) clore(undefined); };
+  });
+}
+
 /* Fenêtres aux couleurs de l'appli (remplacent les boîtes grises d'Android) */
 function demanderNom(titre, indice) {
   return new Promise(fin => {
@@ -1320,6 +1377,7 @@ function renderDocuments(p, ouvert) {
     ${admin && d ? `<button class="icone" id="sup-dossier" aria-label="Supprimer le dossier">✕</button>` : ''}</header>
     <div class="corps">
       <button class="rangee" id="ajout-pdf"><span class="pastille">${ICON.fichier}</span><span class="libelle"><strong>Ajouter un PDF</strong><small>Dans ce dossier${d ? ' : ' + esc(d.nom) : ''}</small></span></button>
+      <div class="zone-rech"><input type="search" id="rech-doc" class="champ-dialogue" placeholder="Rechercher (nom, type, année)" autocomplete="off" /></div>
       <div id="liste-pdf"><p class="vide-doc">Chargement…</p></div>
     </div>`;
   p.querySelector('#ajout-pdf').onclick = () => { pdfDossierImpose = d ? { id: d.id, nom: d.nom } : null; document.getElementById('file-pdf').click(); };
@@ -1330,14 +1388,33 @@ function renderDocuments(p, ouvert) {
     try { await deleteDoc(doc(db, 'dossiers', cur)); } catch (e) { console.error(e); toast('Suppression refusée.'); return; }
     p.dataset.dossier = ''; renderDocuments(p);
   };
-  getDocs(query(collection(db, 'messages'), where('dossierId', '==', cur))).then(snap => {
+  let pdfs = [];
+  const peutSupprimer = m => admin || m.uid === state.user.uid;
+  const dessiner = () => {
     const zone = p.querySelector('#liste-pdf'); if (!zone) return;
-    const pdfs = snap.docs.map(x => ({ id: x.id, ...x.data() })).filter(m => m.kind === 'pdf')
-      .sort((a, b) => (dateDe(b) || 0) - (dateDe(a) || 0));
-    zone.innerHTML = pdfs.length
-      ? pdfs.map(m => `<button type="button" class="rangee fichier-pdf" data-pdf="${esc(m.mediaId)}" data-nom="${esc(m.nom || 'document.pdf')}"><span class="pastille">${ICON.fichier}</span><span class="libelle"><strong>${esc(m.nom || 'Document PDF')}</strong><small>${esc(m.name || '')} · ${esc(etiquette(dateDe(m)))}${m.taille ? ' · ' + m.taille + ' Ko' : ''}</small></span></button>`).join('')
-      : '<p class="vide-doc">Aucun document dans ce dossier.</p>';
+    const q = (p.querySelector('#rech-doc').value || '').trim().toLowerCase();
+    const liste = pdfs.filter(m => !q || [m.nom, m.typeDoc, m.annee, m.name].join(' ').toLowerCase().includes(q));
+    zone.innerHTML = liste.length
+      ? liste.map(m => `<div class="rangee-doc"><button type="button" class="rangee fichier-pdf" data-pdf="${esc(m.mediaId)}" data-nom="${esc(m.nom || 'document.pdf')}"><span class="pastille">${ICON.fichier}</span><span class="libelle"><strong>${esc(m.nom || 'Document PDF')}</strong><small>${[m.typeDoc, m.annee].filter(Boolean).map(esc).join(' · ')}${m.typeDoc || m.annee ? ' · ' : ''}${esc(m.name || '')} · ${esc(etiquette(dateDe(m)))}${m.taille ? ' · ' + m.taille + ' Ko' : ''}</small></span></button>${peutSupprimer(m) ? `<button type="button" class="icone sup-pdf" data-sup="${esc(m.id)}" aria-label="Supprimer ce document">✕</button>` : ''}</div>`).join('')
+      : `<p class="vide-doc">${pdfs.length ? 'Aucun résultat.' : 'Aucun document dans ce dossier.'}</p>`;
     zone.querySelectorAll('[data-pdf]').forEach(b => b.onclick = () => ouvrirPdf(b.dataset.pdf, b.dataset.nom));
+    zone.querySelectorAll('[data-sup]').forEach(b => b.onclick = async () => {
+      const m = pdfs.find(x => x.id === b.dataset.sup); if (!m) return;
+      if (!(await confirmerAction('Supprimer ce document ?', m.nom || 'Document PDF', 'Supprimer'))) return;
+      try {
+        await deleteDoc(doc(db, 'messages', m.id));
+        const n = m.n || 1;
+        for (let i = 0; i < n; i++) await deleteDoc(doc(db, 'media', i === 0 ? m.mediaId : m.mediaId + '_' + i)).catch(() => {});
+        mediaCache.delete(m.mediaId);
+        pdfs = pdfs.filter(x => x.id !== m.id); dessiner(); toast('Document supprimé');
+      } catch (e) { console.error(e); toast('Suppression refusée.'); }
+    });
+  };
+  p.querySelector('#rech-doc').oninput = dessiner;
+  getDocs(query(collection(db, 'messages'), where('dossierId', '==', cur))).then(snap => {
+    pdfs = snap.docs.map(x => ({ id: x.id, ...x.data() })).filter(m => m.kind === 'pdf')
+      .sort((a, b) => (dateDe(b) || 0) - (dateDe(a) || 0));
+    dessiner();
   }).catch(e => { console.error(e); const z = p.querySelector('#liste-pdf'); if (z) z.innerHTML = '<p class="vide-doc">Impossible de charger les documents.</p>'; });
 }
 

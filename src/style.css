@@ -989,3 +989,13 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 
 /* Le bouton d'envoi reste toujours à droite, même pendant la frappe (.ecrit) */
 .layout .ligne-envoi .capsule .outils .send, .layout.ecrit .ligne-envoi .capsule .outils .send { margin: 0 0 0 auto; }
+
+/* Documents : type, recherche, suppression */
+.choix-type { display: flex; flex-wrap: wrap; gap: 8px; }
+.choix-type button { font: inherit; font-weight: 600; border: 1px solid #F5A62366; border-radius: 99px; padding: 8px 14px; background: transparent; color: var(--texte); cursor: pointer; }
+.choix-type button.on { background: #F5A623; border-color: #F5A623; color: #1a1205; }
+.zone-rech { padding: 6px 16px 10px; }
+.zone-rech .champ-dialogue { width: 100%; box-sizing: border-box; }
+.rangee-doc { display: flex; align-items: center; }
+.rangee-doc .rangee { flex: 1; min-width: 0; }
+.rangee-doc .sup-pdf { flex: none; margin-right: 8px; color: var(--danger); }
