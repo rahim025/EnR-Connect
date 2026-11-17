@@ -403,6 +403,28 @@ try { Object.entries(JSON.parse(localStorage.getItem('profils') || '{}')).forEac
 const sauverProfils = () => { try { localStorage.setItem('profils', JSON.stringify(Object.fromEntries(profils))); } catch { /* ignoré */ } };
 const dejaDemande = new Set();
 
+/* Rôles (créateur / admin) : sert à afficher un badge à côté du nom dans le chat */
+const roles = new Map();
+try { Object.entries(JSON.parse(localStorage.getItem('roles') || '{}')).forEach(([k, v]) => roles.set(k, v)); } catch { /* ignoré */ }
+const sauverRoles = () => { try { localStorage.setItem('roles', JSON.stringify(Object.fromEntries(roles))); } catch { /* ignoré */ } };
+const roleDe = uid => (state.user && uid === state.user.uid) ? state.role : (roles.get(uid) || '');
+const badgeRoleHTML = uid => {
+  const r = roleDe(uid);
+  if (r !== 'admin' && r !== 'createur') return '';
+  return `<span class=\"badge-role ${r}\" title=\"${r === 'createur' ? 'Créateur du groupe' : 'Administrateur'}\">${ICON.shield}${r === 'createur' ? 'Créateur' : 'Admin'}</span>`;
+};
+const rolesDemandes = new Set();
+function chargerRoles(uids) {
+  uids.forEach(uid => {
+    if (!uid || roles.has(uid) || rolesDemandes.has(uid)) return;
+    rolesDemandes.add(uid);
+    getDoc(doc(db, 'users', uid)).then(snap => {
+      roles.set(uid, snap.exists() ? (snap.data().role || 'member') : 'member');
+      sauverRoles(); renderFeed();
+    }).catch(() => rolesDemandes.delete(uid));
+  });
+}
+
 const avatarHTML = (nom, cle, cache = false) => {
   const p = cle && profils.get(cle);
   const lien = cle ? ` data-prof="${esc(cle)}"` : '';
@@ -475,6 +497,34 @@ function toast(texte) {
   t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = texte;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3200);
+}
+
+/* Réglage « Micro » : autoriser depuis l'appli, ou ouvrir les réglages Android si le micro a été refusé */
+async function brancherReglageMicro(p) {
+  const etat = p.querySelector('#micro-etat'), btn = p.querySelector('#micro-btn');
+  if (!etat || !btn) return;
+  const maj = async () => {
+    let ok = false;
+    try { ok = (await Watcher.microGranted()).granted; } catch { /* ignoré */ }
+    etat.textContent = ok ? 'Autorisé : tu peux envoyer des vocaux et parler en appel.' : 'Non autorisé : nécessaire pour les vocaux et les appels.';
+    btn.hidden = ok;
+  };
+  btn.onclick = async () => {
+    try {
+      const f = await navigator.mediaDevices.getUserMedia({ audio: true });
+      f.getTracks().forEach(t => t.stop());
+      toast('Micro autorisé.');
+    } catch {
+      // Refusé (parfois définitivement) : Android ne redemande plus, il faut passer par ses réglages
+      if (await confirmer('Micro refusé', 'Active « Micro » dans les autorisations de l\'appli.', 'Ouvrir les réglages')) Watcher.openSettings().catch(() => {});
+    }
+    maj();
+  };
+  maj();
+  document.addEventListener('visibilitychange', function retour() {
+    if (!document.body.contains(etat)) { document.removeEventListener('visibilitychange', retour); return; }
+    if (!document.hidden) maj(); // retour depuis les réglages Android
+  });
 }
 
 /* ---------- Notifications et bulle (Android) ---------- */
@@ -744,7 +794,7 @@ function ligneHTML(x, debut, fin) {
       <div class="rang annonce-rang">
         <div class="colonne">
           <article class="bulle annonce" data-id="${m.id}">
-            <div class="qui" data-prof="${esc(m.uid)}">${ICON.megaphone}<span>Annonce de ${esc(m.name)}</span></div>
+            <div class="qui" data-prof="${esc(m.uid)}">${ICON.megaphone}<span>Annonce de ${esc(m.name)}</span>${badgeRoleHTML(m.uid)}</div>
             ${citationHTML(m)}${contenuHTML(m)}
           </article>
           ${reacsHTML(m)}${detailHTML(m, moi)}
@@ -758,7 +808,7 @@ function ligneHTML(x, debut, fin) {
     <div class="rang ${moi ? 'moi' : 'autre'}${debut ? ' nouveau' : ''}">
       ${moi ? '' : avatarHTML(m.name, m.uid, !fin)}
       <div class="colonne">
-        ${!moi && debut ? `<div class="qui" data-prof="${esc(m.uid)}">${esc(m.name)}</div>` : ''}
+        ${!moi && debut ? `<div class="qui" data-prof="${esc(m.uid)}"><span class="nom-qui">${esc(m.name)}</span>${badgeRoleHTML(m.uid)}</div>` : ''}
         ${image ? citationHTML(m) : ''}
         <article class="bulle ${moi ? 'moi' : 'autre'} ${pos}${photo}" data-id="${m.id}">${image ? '' : citationHTML(m)}${contenuHTML(m)}</article>
         ${reacsHTML(m)}
@@ -841,6 +891,7 @@ function renderFeedBase() {
     state.dernierId = dernier.id; state.dernierT = t;
   }
   verifierProfils(ms);
+  chargerRoles([...new Set(ms.map(m => m.uid))]);
   // Mode normal : charger automatiquement les photos
   if (!state.eco) ms.filter(m => m.kind === 'image' && !mediaCache.has(m.mediaId)).forEach(m => loadMedia(m.mediaId));
 }
@@ -1211,7 +1262,7 @@ async function demarrerVocal() {
   if (!navigator.mediaDevices || !window.MediaRecorder) { toast('Vocal non pris en charge sur cet appareil.'); return false; }
   let flux;
   try { flux = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch { toast('Autorise le micro pour envoyer un vocal.'); return false; }
+  catch { toast(NATIF ? 'Micro refusé : autorise-le dans Réglages › Micro.' : 'Autorise le micro pour envoyer un vocal.'); return false; }
   const mime = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
   let rec;
   try { rec = new MediaRecorder(flux, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 24000 }); }
@@ -1755,6 +1806,13 @@ function renderSettings(p) {
         </select>
       </div>` : ''}
 
+      ${NATIF ? `
+      <div class="rangee statique">
+        <span class="pastille">${ICON.micro}</span>
+        <span class="libelle"><strong>Micro</strong><small id="micro-etat">Vérification…</small></span>
+        <button type="button" class="petit" id="micro-btn">Autoriser</button>
+      </div>` : ''}
+
       <h3 class="titre-section">Membres <span id="nb-membres"></span></h3>
       <div id="membres"><p class="note">Chargement…</p></div>
 
@@ -1799,6 +1857,7 @@ function renderSettings(p) {
     if (state.notif) demarrerNotifs();
   };
   p.querySelector('#theme').onchange = ev => reglerTheme(ev.target.value);
+  if (NATIF) brancherReglageMicro(p);
   p.querySelector('#mon-profil').onclick = () => modifierProfil();
   p.querySelector('#a-propos').onclick = () => openPanel('about');
   p.querySelector('#logout').onclick = () => { closePanel(); arreterNotifs(); P.arreter(); signOut(auth); };
@@ -1863,8 +1922,8 @@ let listeMembres = [];
 async function chargerListeMembres() {
   try {
     listeMembres = await P.chargerMembres();
-    listeMembres.forEach(m => { profils.set(m.uid, { photo: m.photo || '', statut: m.statut || '', pv: (profils.get(m.uid) || {}).pv || 0 }); });
-    sauverProfils();
+    listeMembres.forEach(m => { roles.set(m.uid, m.role || 'member'); profils.set(m.uid, { photo: m.photo || '', statut: m.statut || '', pv: (profils.get(m.uid) || {}).pv || 0 }); });
+    sauverProfils(); sauverRoles();
   } catch (e) { listeMembres = null; }
   remplirMembres();
 }

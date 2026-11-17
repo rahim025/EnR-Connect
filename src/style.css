@@ -1028,3 +1028,10 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .vocal .tps { flex: none; min-width: 2.4em; text-align: right; font-size: .78rem; opacity: .85; }
 .vocal .vit { flex: none; font: inherit; font-size: .72rem; font-weight: 700; padding: 3px 7px; border-radius: 99px; background: #0003; color: inherit; }
 .vocal .vit[hidden] { display: none; }
+
+/* Badge Admin / Créateur à côté du nom dans le chat */
+.qui { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.badge-role { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px 1px 5px; border-radius: 99px; font-size: .62rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; line-height: 1.5; background: var(--accent); color: #fff; }
+.badge-role svg { width: 11px; height: 11px; flex: none; }
+.badge-role.createur { background: linear-gradient(135deg, #F5B93A, #E8871E); color: #fff; }
+.bulle.annonce .qui .badge-role { margin-left: auto; }
