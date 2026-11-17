@@ -23,6 +23,19 @@ service cloud.firestore {
                     && (!('text' in request.resource.data) || request.resource.data.text.size() <= 2000)
                     && (request.resource.data.kind != 'announce' || isAdmin());
       allow delete: if isAdmin() || (isMember() && resource.data.uid == request.auth.uid);
+      // Réactions : tout membre. Modification du texte : l'auteur seulement. Admin : tout.
+      allow update: if isAdmin()
+                    || (isMember() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']))
+                    || (isMember() && resource.data.uid == request.auth.uid
+                        && request.resource.data.uid == resource.data.uid
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'editedAt'])
+                        && request.resource.data.text.size() <= 2000);
+    }
+
+    // Message épinglé (un seul document : meta/epingle)
+    match /meta/{id} {
+      allow read:  if isMember();
+      allow write: if isAdmin();
     }
 
     match /media/{id} {
