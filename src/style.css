@@ -85,7 +85,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 /* ---------- Soleil et avatar du groupe ---------- */
 .logo {
   display: block; flex: none; width: 100%; height: 100%; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #FFD98A, var(--soleil) 62%);
+  background: url('./assets/enset-logo.webp') center / 92% no-repeat, radial-gradient(circle at 50% 40%, #12414a, #0a2227 75%);
 }
 .logo.grand { width: 100%; height: 100%; }
 .avatar-groupe { position: relative; flex: none; width: 40px; height: 40px; display: block; }
@@ -999,3 +999,32 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .rangee-doc { display: flex; align-items: center; }
 .rangee-doc .rangee { flex: 1; min-width: 0; }
 .rangee-doc .sup-pdf { flex: none; margin-right: 8px; color: var(--danger); }
+
+/* Appel de groupe dans l'appli */
+.appel-plein { position: fixed; inset: 0; z-index: 200; background: #000; display: flex; flex-direction: column; }
+.appel-barre { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: calc(8px + env(safe-area-inset-top)) 12px 8px; background: var(--bg); color: var(--texte); }
+.appel-plein iframe { flex: 1; width: 100%; border: 0; background: #000; }
+
+/* Messages vocaux façon WhatsApp */
+.bandeau-vocal { display: flex; align-items: center; gap: 10px; margin: 0 4px; padding: 6px 8px 6px 12px; border-radius: 12px; background: var(--surface2); border-left: 3px solid var(--danger); font-size: .88rem; }
+.bandeau-vocal[hidden] { display: none; }
+.bandeau-vocal .rec { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: rec-pouls 1s ease-in-out infinite; }
+.bandeau-vocal .vocal-aide { flex: 1; color: var(--texte2); }
+.bandeau-vocal .petit { display: none; }
+.bandeau-vocal.verrou .petit { display: inline-block; }
+.bandeau-vocal.annule .vocal-aide { color: var(--danger); font-weight: 600; }
+@keyframes rec-pouls { 50% { opacity: .25; } }
+.send[data-mode="micro"] { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.send .i-micro { display: none; }
+.send[data-mode="micro"] .i-like { display: none; }
+.send[data-mode="micro"] .i-micro, .capsule .send[data-mode="micro"] .i-micro { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.send[data-mode="micro"] .i-micro svg { width: 22px; height: 22px; }
+.send.enreg { transform: scale(1.35); background: #E5484D; color: #fff; box-shadow: 0 0 0 8px #E5484D55; transition: transform .15s ease; }
+.vocal { display: flex; align-items: center; gap: 8px; min-width: 230px; }
+.vocal .pl { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #F5A62333; color: inherit; font-size: .95rem; padding: 0; }
+.vocal .onde { flex: 1; height: 32px; display: flex; align-items: center; gap: 2px; cursor: pointer; }
+.vocal .onde i { flex: 1; min-width: 2px; border-radius: 2px; background: currentColor; opacity: .35; }
+.vocal .onde i.fait { opacity: 1; }
+.vocal .tps { flex: none; min-width: 2.4em; text-align: right; font-size: .78rem; opacity: .85; }
+.vocal .vit { flex: none; font: inherit; font-size: .72rem; font-weight: 700; padding: 3px 7px; border-radius: 99px; background: #0003; color: inherit; }
+.vocal .vit[hidden] { display: none; }

@@ -366,6 +366,7 @@ const F = d => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 const ICON = {
   dossier: S('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
   fichier: S('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/>'),
+  micro: S('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'),
   telephone: S('<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>'),
   retour: S('<path d="M15 5l-7 7 7 7"/>'),
   recherche: S('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),
@@ -574,6 +575,7 @@ function renderShell() {
       <div class="frappe" id="frappe" hidden aria-live="polite"><span class="eclairs"><i></i><i></i><i></i></span><span id="frappe-txt"></span></div>
       <form class="envoi" id="form">
         <div class="bandeau-contexte" id="contexte" hidden></div>
+        <div class="bandeau-vocal" id="bandeau-vocal" hidden><i class="rec"></i><span id="vocal-temps">0:00</span><span class="vocal-aide">◀ Glisse pour annuler · ▲ verrouiller</span><button type="button" class="petit" id="vocal-annuler">Annuler</button><button type="button" class="petit" id="vocal-envoyer">Envoyer</button></div>
         <div class="bandeau-annonce" id="bandeau" hidden>${ICON.megaphone}<span>Ce message sera publié comme annonce</span></div>
         <div class="ligne-envoi"><div class="capsule">
           <textarea id="texte" rows="1" placeholder="Message" maxlength="2000" aria-label="Message"></textarea>
@@ -581,8 +583,8 @@ function renderShell() {
           <button type="button" class="icone accent" id="btn-photo" aria-label="Envoyer une photo">${ICON.camera}</button>
           <button type="button" class="icone accent" id="btn-pdf" aria-label="Envoyer un PDF">${ICON.fichier}</button>
           ${admin ? `<button type="button" class="icone accent" id="btn-annonce" aria-label="Publier comme annonce" aria-pressed="false">${ICON.megaphone}</button>` : ''}
-          <button class="send" type="submit" id="btn-send" data-mode="like" aria-label="Envoyer un J'aime">
-            <span class="i-like">${ICON.like}</span><span class="i-send">${ICON.send}</span>
+          <button class="send" type="submit" id="btn-send" data-mode="micro" aria-label="Maintiens pour enregistrer un vocal">
+            <span class="i-like">${ICON.like}</span><span class="i-micro">${ICON.micro}</span><span class="i-send">${ICON.send}</span>
           </button>
         </div></div></div>
       </form>
@@ -603,6 +605,9 @@ function renderShell() {
     if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(min-width: 700px)').matches) { e.preventDefault(); envoyer(); }
   });
   document.getElementById('form').onsubmit = e => { e.preventDefault(); envoyer(); };
+  brancherMicro();
+  document.getElementById('vocal-annuler').onclick = () => arreterVocal(false);
+  document.getElementById('vocal-envoyer').onclick = () => arreterVocal(true);
   document.getElementById('btn-photo').onclick = () => document.getElementById('file').click();
   document.getElementById('file').onchange = onPickPhoto;
   document.getElementById('btn-pdf').onclick = () => { pdfDossierImpose = null; document.getElementById('file-pdf').click(); };
@@ -655,8 +660,8 @@ function majBoutonEnvoi() {
   const b = document.getElementById('btn-send'); const box = document.getElementById('texte');
   if (!b || !box) return;
   const vide = !box.value.trim();
-  b.dataset.mode = vide ? 'like' : 'send';
-  b.setAttribute('aria-label', vide ? "Envoyer un J'aime" : 'Envoyer');
+  b.dataset.mode = vide ? 'micro' : 'send';
+  b.setAttribute('aria-label', vide ? 'Maintiens pour enregistrer un vocal' : 'Envoyer');
 }
 
 function renderStatut() {
@@ -687,12 +692,17 @@ function contenuHTML(m) {
   if (m.kind === 'pdf') {
     return `<button type="button" class="fichier-pdf" data-pdf="${esc(m.mediaId)}" data-nom="${esc(m.nom || 'document.pdf')}">${ICON.fichier}<span><strong>${esc(m.nom || 'Document PDF')}</strong><small>${m.dossierNom ? esc(m.dossierNom) + ' · ' : ''}PDF${m.taille ? ' · ' + m.taille + ' Ko' : ''} · Appuie pour ouvrir</small></span></button>`;
   }
+  if (m.kind === 'audio') {
+    const id = esc(m.mediaId);
+    const barres = ondeDe(m);
+    return `<div class="vocal"><button type="button" class="pl" data-audio="${id}" aria-label="Lire le vocal">▶</button><div class="onde" data-onde="${id}">${barres.map(h => `<i style="height:${h}%"></i>`).join('')}</div><small class="tps" data-total="${m.duree || 0}">${dureeTxt(m.duree || 0)}</small><button type="button" class="vit" data-vitesse="1" hidden>${vitesse}×</button></div>`;
+  }
   return `<div class="texte">${lierURL(esc(m.text)).replace(/\n/g, '<br>')}${m.editedAt ? '<span class="modifie">modifié</span>' : ''}</div>`;
 }
 
 const REACTIONS = [['coeur', '❤️'], ['pouce', '👍'], ['rire', '😂'], ['wow', '😮'], ['triste', '😢'], ['merci', '🙏']];
 const trouver = id => state.messages.find(m => m.id === id);
-const extrait = (m, n = 90) => m.kind === 'image' ? '📷 Photo' : m.kind === 'pdf' ? '📄 ' + (m.nom || 'PDF') : String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, n);
+const extrait = (m, n = 90) => m.kind === 'image' ? '📷 Photo' : m.kind === 'audio' ? '🎤 Message vocal' : m.kind === 'pdf' ? '📄 ' + (m.nom || 'PDF') : String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, n);
 const monAv = () => (profils.get(state.user.uid) || {}).pv || 0;
 
 const citationHTML = m => m.reply
@@ -718,9 +728,9 @@ function detailHTML(m, moi) {
       `<button type="button" class="${(r[k] || []).includes(state.user.uid) ? 'actif' : ''}" data-react="${k}" data-id="${m.id}" aria-label="Réagir ${e}">${e}</button>`).join('')}</div>`;
     h += `<div class="detail actions-msg"><span>${esc(etiquette(dateDe(m)))}</span>
       <button type="button" data-reply="${m.id}">${ICON.repondre}Répondre</button>
-      ${m.kind !== 'image' && m.kind !== 'pdf' ? `<button type="button" data-copy="${m.id}">${ICON.copier}Copier</button>` : ''}
+      ${!['image', 'pdf', 'audio'].includes(m.kind) ? `<button type="button" data-copy="${m.id}">${ICON.copier}Copier</button>` : ''}
       ${moi && m.kind === 'text' && m.text !== '👍' ? `<button type="button" data-edit="${m.id}">${ICON.crayon}Modifier</button>` : ''}
-      ${admin && m.kind !== 'image' && m.kind !== 'pdf' ? `<button type="button" data-pin="${m.id}">${ICON.epingle}Épingler</button>` : ''}
+      ${admin && !['image', 'pdf', 'audio'].includes(m.kind) ? `<button type="button" data-pin="${m.id}">${ICON.epingle}Épingler</button>` : ''}
       ${(admin || moi) ? `<button type="button" class="suppr" data-del="${m.id}">Supprimer</button>` : ''}
     </div>`;
   }
@@ -793,7 +803,8 @@ function accueilGroupeHTML() {
   </section>`;
 }
 
-function renderFeed() {
+function renderFeed() { renderFeedBase(); if (typeof majVocaux === 'function') majVocaux(); }
+function renderFeedBase() {
   const fil = document.getElementById('fil'); if (!fil) return;
   const proche = fil.scrollHeight - fil.scrollTop - fil.clientHeight < 140;
   const ms = state.messages;
@@ -845,7 +856,13 @@ async function loadMedia(id) {
 }
 
 async function onFeedClick(e) {
-  if (e.target.closest('a')) return; // un lien s'ouvre sans sélectionner la bulle
+  const lien = e.target.closest('a');
+  if (lien) { // un lien s'ouvre sans sélectionner la bulle
+    if (estLienAppel(lien.href)) { e.preventDefault(); ouvrirSalle(false); } // le lien d'appel s'ouvre dans l'appli
+    return;
+  }
+  const onde = e.target.closest('[data-onde]');
+  if (onde) { chercherVocal(e, onde); return; }
   const t = e.target.closest('button');
   if (!t) {
     const prof = e.target.closest('[data-prof]');
@@ -858,6 +875,8 @@ async function onFeedClick(e) {
   if (d.plus) { t.textContent = 'Chargement…'; state.limit += PAGE; subscribeMessages(); return; }
   if (d.media) { t.querySelector('strong').textContent = 'Chargement…'; loadMedia(d.media); return; }
   if (d.pdf) { ouvrirPdf(d.pdf, d.nom); return; }
+  if (d.audio) { jouerVocal(d.audio); return; }
+  if (d.vitesse !== undefined) { changerVitesse(); return; }
   if (d.del) {
     const ok = await confirmer('Supprimer ce message ?', 'Il sera supprimé pour tout le monde dans le groupe.', 'Supprimer');
     if (ok) { state.sel = null; deleteDoc(doc(db, 'messages', d.del)).catch(() => toast('Suppression impossible.')); }
@@ -1083,7 +1102,7 @@ function envoyer() {
     annulerContexte(true);
     return;
   }
-  if (!text) { envoyerMessage('👍'); return; } // zone vide : le bouton envoie un « J'aime »
+  if (!text) return; // zone vide : le bouton sert à enregistrer un vocal (maintenir appuyé)
   envoyerMessage(text, state.announce && estAdmin() ? 'announce' : 'text');
   box.value = ''; box.style.height = '';
   const lay = document.querySelector('.layout'); if (lay) lay.classList.remove('ecrit');
@@ -1169,15 +1188,213 @@ async function ouvrirPdf(id, nom) {
   }
 }
 
-/* ---------- Appels de groupe (vocal ou vidéo) via une salle Jitsi Meet partagée ---------- */
-const SALLE_APPEL = 'https://meet.jit.si/EnRConnect-ER1-Annee1';
+/* ---------- Messages vocaux façon WhatsApp : maintiens le micro, glisse à gauche pour annuler, vers le haut pour verrouiller ---------- */
+const VOCAL_MAX = 120;
+const VITESSES = [1, 1.5, 2];
+let enreg = null;
+let lecture = null; // {id, a, duree}
+let vitesse = 1;
+let geste = null;
+const dureeTxt = sec => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+
+function majBandeauVocal() {
+  const b = document.getElementById('bandeau-vocal'); if (!b) return;
+  b.hidden = !enreg;
+  b.classList.toggle('verrou', !!(enreg && enreg.verrou));
+  b.classList.toggle('annule', !!(geste && geste.annule));
+  const aide = b.querySelector('.vocal-aide');
+  if (aide) aide.textContent = enreg && enreg.verrou ? 'Enregistrement verrouillé' : (geste && geste.annule ? 'Relâche pour annuler' : '◀ Glisse pour annuler · ▲ verrouiller');
+}
+
+async function demarrerVocal() {
+  if (enreg) return false;
+  if (!navigator.mediaDevices || !window.MediaRecorder) { toast('Vocal non pris en charge sur cet appareil.'); return false; }
+  let flux;
+  try { flux = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch { toast('Autorise le micro pour envoyer un vocal.'); return false; }
+  const mime = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+  let rec;
+  try { rec = new MediaRecorder(flux, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 24000 }); }
+  catch { flux.getTracks().forEach(t => t.stop()); toast('Vocal non pris en charge sur cet appareil.'); return false; }
+  let ctx = null, analyseur = null;
+  try {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    analyseur = ctx.createAnalyser(); analyseur.fftSize = 512;
+    ctx.createMediaStreamSource(flux).connect(analyseur);
+  } catch { ctx = null; analyseur = null; }
+  const morceaux = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size) morceaux.push(e.data); };
+  enreg = { rec, flux, morceaux, debut: Date.now(), mime: rec.mimeType || mime || 'audio/webm', envoyer: false, arret: false, verrou: false, minuteur: null, ctx, niveaux: [] };
+  rec.onstop = finVocal;
+  rec.start();
+  if (navigator.vibrate) navigator.vibrate(25);
+  majBandeauVocal();
+  const temps = document.getElementById('vocal-temps');
+  const tampon = analyseur ? new Uint8Array(analyseur.fftSize) : null;
+  enreg.minuteur = setInterval(() => {
+    if (!enreg) return;
+    const sec = Math.floor((Date.now() - enreg.debut) / 1000);
+    if (temps) temps.textContent = dureeTxt(sec);
+    if (tampon) {
+      analyseur.getByteTimeDomainData(tampon);
+      let somme = 0; for (const v of tampon) somme += (v - 128) * (v - 128);
+      enreg.niveaux.push(Math.sqrt(somme / tampon.length) / 128);
+    }
+    if (sec >= VOCAL_MAX) arreterVocal(true);
+  }, 100);
+  return true;
+}
+
+function arreterVocal(envoyer) {
+  if (!enreg || enreg.arret) return;
+  enreg.arret = true; enreg.envoyer = envoyer;
+  clearInterval(enreg.minuteur);
+  try { enreg.rec.stop(); } catch { finVocal(); }
+  enreg.flux.getTracks().forEach(t => t.stop()); // coupe le micro
+}
+
+/* 40 barres pour dessiner la forme du son */
+function reduireOnde(niv, n = 40) {
+  if (!niv.length) return Array(n).fill(20);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const a = Math.floor(i * niv.length / n), b = Math.max(a + 1, Math.floor((i + 1) * niv.length / n));
+    let m = 0; for (let j = a; j < b && j < niv.length; j++) m = Math.max(m, niv[j]);
+    out.push(m);
+  }
+  const max = Math.max(...out, 0.02);
+  return out.map(v => Math.max(8, Math.round(100 * v / max)));
+}
+function ondeDe(m) {
+  if (Array.isArray(m.onde) && m.onde.length) return m.onde;
+  let h = 0; for (const c of String(m.mediaId || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return Array.from({ length: 40 }, () => { h = (h * 1103515245 + 12345) >>> 0; return 20 + (h >> 8) % 70; });
+}
+
+async function finVocal() {
+  const e = enreg; enreg = null; geste = null;
+  majBandeauVocal();
+  const temps = document.getElementById('vocal-temps'); if (temps) temps.textContent = '0:00';
+  if (e && e.ctx) { try { e.ctx.close(); } catch { /* ignoré */ } }
+  if (!e || !e.envoyer) return;
+  const duree = Math.round((Date.now() - e.debut) / 1000);
+  if (duree < 1 || !e.morceaux.length) { toast('Vocal trop court.'); return; }
+  try {
+    const data = await new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(new Blob(e.morceaux, { type: e.mime })); });
+    if (data.length > 700000) { toast('Vocal trop long.'); return; }
+    const mref = doc(collection(db, 'media'));
+    mediaCache.set(mref.id, data);
+    setDoc(mref, { uid: state.user.uid, data, kind: 'audio', createdAt: serverTimestamp() }).catch(console.error);
+    addDoc(collection(db, 'messages'), {
+      uid: state.user.uid, name: nomAffiche(state.user), kind: 'audio', mediaId: mref.id, duree, onde: reduireOnde(e.niveaux), av: monAv(), createdAt: serverTimestamp()
+    }).catch(console.error);
+  } catch (err) { console.error(err); toast('Vocal non envoyé.'); }
+}
+
+/* Geste sur le bouton rond : maintenir = enregistrer, relâcher = envoyer, glisser à gauche = annuler, glisser vers le haut = verrouiller */
+function brancherMicro() {
+  const b = document.getElementById('btn-send'); if (!b) return;
+  b.addEventListener('contextmenu', e => { if (b.dataset.mode === 'micro') e.preventDefault(); });
+  b.addEventListener('pointerdown', e => {
+    if (b.dataset.mode !== 'micro' || (e.pointerType === 'mouse' && e.button !== 0) || enreg || geste) return;
+    e.preventDefault();
+    const g = geste = { x0: e.clientX, y0: e.clientY, annule: false, relache: false };
+    try { b.setPointerCapture(e.pointerId); } catch { /* ignoré */ }
+    b.classList.add('enreg');
+    demarrerVocal().then(ok => {
+      if (!ok) { if (geste === g) geste = null; b.classList.remove('enreg'); return; }
+      if (g.relache) { arreterVocal(false); toast('Maintiens le bouton pour enregistrer'); }
+    });
+  });
+  b.addEventListener('pointermove', e => {
+    const g = geste; if (!g || (enreg && enreg.verrou)) return;
+    const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+    if (dy < -70 && enreg) { enreg.verrou = true; g.annule = false; b.classList.remove('enreg'); }
+    else g.annule = dx < -90;
+    majBandeauVocal();
+  });
+  const fin = (e, tout) => {
+    const g = geste; if (!g) return;
+    g.relache = true; geste = null; b.classList.remove('enreg');
+    try { b.releasePointerCapture(e.pointerId); } catch { /* ignoré */ }
+    if (!enreg) return; // micro pas encore prêt : demarrerVocal s'en occupe
+    if (enreg.verrou) { majBandeauVocal(); return; }
+    const long = Date.now() - enreg.debut >= 700;
+    arreterVocal(long && !g.annule && !tout);
+    if (!long && !tout) toast('Maintiens le bouton pour enregistrer');
+  };
+  b.addEventListener('pointerup', e => fin(e, false));
+  b.addEventListener('pointercancel', e => fin(e, true));
+}
+
+/* Lecture : forme d'onde qui se remplit, appui sur l'onde pour avancer, vitesse 1× / 1,5× / 2× */
+async function jouerVocal(id, ratio = 0) {
+  if (lecture && lecture.id === id) {
+    if (ratio > 0 && lecture.duree) { try { lecture.a.currentTime = ratio * lecture.duree; } catch { /* ignoré */ } if (lecture.a.paused) lecture.a.play().catch(() => {}); }
+    else if (lecture.a.paused) lecture.a.play().catch(() => {}); else lecture.a.pause();
+    majVocaux(); return;
+  }
+  if (lecture) { lecture.a.pause(); lecture = null; }
+  try {
+    if (!mediaCache.has(id)) {
+      toast('Chargement du vocal…');
+      const snap = await getDoc(doc(db, 'media', id));
+      if (!snap.exists()) { toast('Vocal introuvable.'); return; }
+      mediaCache.set(id, snap.data().data);
+    }
+    const msg = state.messages.find(x => x.mediaId === id);
+    const a = new Audio(mediaCache.get(id));
+    lecture = { id, a, duree: (msg && msg.duree) || 0 };
+    a.playbackRate = vitesse;
+    a.onplay = a.onpause = a.ontimeupdate = majVocaux;
+    a.onended = () => { if (lecture && lecture.a === a) lecture = null; majVocaux(); };
+    if (ratio > 0 && lecture.duree) a.addEventListener('loadedmetadata', () => { try { a.currentTime = ratio * lecture.duree; } catch { /* ignoré */ } }, { once: true });
+    await a.play();
+  } catch (err) { console.error(err); lecture = null; toast('Impossible de lire ce vocal.'); }
+  majVocaux();
+}
+
+function chercherVocal(e, onde) {
+  const r = onde.getBoundingClientRect();
+  const ratio = Math.min(1, Math.max(0.001, (e.clientX - r.left) / (r.width || 1)));
+  jouerVocal(onde.dataset.onde, ratio);
+}
+
+function changerVitesse() {
+  vitesse = VITESSES[(VITESSES.indexOf(vitesse) + 1) % VITESSES.length];
+  if (lecture) lecture.a.playbackRate = vitesse;
+  majVocaux();
+}
+
+function majVocaux() {
+  document.querySelectorAll('.vocal').forEach(bloc => {
+    const pl = bloc.querySelector('.pl'); if (!pl) return;
+    const cur = lecture && lecture.id === pl.dataset.audio ? lecture : null;
+    pl.textContent = cur && !cur.a.paused ? '⏸' : '▶';
+    const barres = bloc.querySelectorAll('.onde i');
+    const ratio = cur && cur.duree ? Math.min(1, cur.a.currentTime / cur.duree) : 0;
+    const n = Math.floor(ratio * barres.length);
+    barres.forEach((x, i) => x.classList.toggle('fait', i < n));
+    const tps = bloc.querySelector('.tps');
+    if (tps) tps.textContent = dureeTxt(Math.floor(cur ? cur.a.currentTime : Number(tps.dataset.total || 0)));
+    const vit = bloc.querySelector('.vit'); if (vit) { vit.hidden = !cur; vit.textContent = vitesse + '×'; }
+  });
+}
+
+/* ---------- Appels de groupe (vocal ou vidéo), dans l'appli, via une salle Jitsi Meet ---------- */
+const APPEL_BASE = 'https://meet.jit.si/';
+const APPEL_SALLE = 'EnR-5oq9s041coz79l'; // nom long et aléatoire : la salle ne se devine pas
+const SALLE_APPEL = APPEL_BASE + APPEL_SALLE;
+const estLienAppel = h => String(h || '').startsWith(SALLE_APPEL);
+let appelOuvert = null;
+
 function ouvrirAppel() {
   const o = document.createElement('div');
   o.className = 'voile';
   o.innerHTML = `
     <div class="dialogue" role="dialog" aria-modal="true" aria-label="Appel de groupe">
       <h3>Appel de groupe</h3>
-      <p>Tout le groupe ER1 peut rejoindre la même salle. Un message avec le lien est envoyé dans la discussion.</p>
+      <p>Tout le groupe ER1 peut rejoindre la même salle (jusqu'à 55 personnes). Un message avec le lien est envoyé dans la discussion. Pour que ça tienne, les micros démarrent coupés après les 3 premiers et les caméras sont coupées par défaut.</p>
       <div class="boutons appel">
         <button type="button" class="annuler">Annuler</button>
         <button type="button" class="valider neutre" data-mode="voix">Appel vocal</button>
@@ -1190,11 +1407,52 @@ function ouvrirAppel() {
   o.onclick = e => { if (e.target === o) fin(); };
   o.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { fin(); lancerAppel(b.dataset.mode === 'video'); });
 }
+
 function lancerAppel(video) {
-  const url = SALLE_APPEL + (video ? '' : '#config.startWithVideoMuted=true');
-  envoyerMessage((video ? '📹 Appel vidéo de groupe' : '📞 Appel vocal de groupe') + ' lancé par ' + nomAffiche(state.user) + '. Rejoins-nous : ' + url);
-  if (NATIF) Browser.open({ url }).catch(() => window.open(url, '_blank'));
-  else window.open(url, '_blank', 'noopener');
+  envoyerMessage((video ? '📹 Appel vidéo de groupe' : '📞 Appel vocal de groupe') + ' lancé par ' + nomAffiche(state.user) + '. Rejoins-nous : ' + SALLE_APPEL);
+  ouvrirSalle(video, !video);
+}
+
+/* Ouvre la salle dans un écran plein de l'appli (la caméra démarre coupée pour économiser les données) */
+function ouvrirSalle(video = false, audioSeul = false) {
+  if (appelOuvert) return;
+  const nom = nomAffiche(state.user) || 'Étudiant';
+  const reglages = [
+    'config.startWithVideoMuted=' + (video ? 'false' : 'true'),
+    'config.startAudioMuted=3', // à partir de la 4e personne, le micro démarre coupé
+    'config.channelLastN=4', // seules les 4 dernières personnes qui parlent envoient leur vidéo (économise la data et le processeur)
+    ...(audioSeul ? ['config.startAudioOnly=true'] : []),
+    'config.prejoinConfig.enabled=false',
+    'config.prejoinPageEnabled=false',
+    'config.disableDeepLinking=true',
+    'userInfo.displayName=' + encodeURIComponent('"' + nom.replace(/["\\]/g, '') + '"')
+  ].join('&');
+  const o = document.createElement('div');
+  o.className = 'appel-plein';
+  o.innerHTML = `
+    <div class="appel-barre">
+      <button type="button" class="petit danger" id="appel-quitter">Quitter l'appel</button>
+      <button type="button" class="petit" id="appel-externe">Ouvrir dans le navigateur</button>
+    </div>
+    <iframe title="Appel de groupe" src="${SALLE_APPEL}#${reglages}" allow="camera; microphone; autoplay; display-capture; fullscreen"></iframe>`;
+  document.body.appendChild(o);
+  appelOuvert = o;
+  history.pushState({ appel: 1 }, '');
+  const surRetour = () => fermer(true);
+  const fermer = (dejaRevenu = false) => {
+    window.removeEventListener('popstate', surRetour);
+    o.querySelector('iframe').src = 'about:blank'; // coupe micro et caméra
+    o.remove(); appelOuvert = null;
+    if (!dejaRevenu && history.state && history.state.appel) history.back();
+  };
+  window.addEventListener('popstate', surRetour);
+  o.querySelector('#appel-quitter').onclick = () => fermer(false);
+  o.querySelector('#appel-externe').onclick = () => {
+    const url = SALLE_APPEL;
+    fermer(false);
+    if (NATIF) Browser.open({ url }).catch(() => window.open(url, '_blank'));
+    else window.open(url, '_blank', 'noopener');
+  };
 }
 
 /* ---------- Photos (compressées pour économiser les mégas) ---------- */
@@ -1595,7 +1853,7 @@ function renderAbout(p) {
         <li>Un problème ou un abus ? Préviens un administrateur.</li>
       </ol>
       <h3 class="titre-section">Bon à savoir</h3>
-      <p class="note">Appuie sur un message pour réagir, répondre, copier, modifier ou supprimer le tien. Tu peux envoyer des photos et des PDF (700 Ko maximum), et lancer un appel vocal ou vidéo de groupe avec le bouton téléphone en haut. Les photos sont réduites automatiquement. En mode économique, elles restent masquées jusqu'à ce que tu appuies dessus.</p>
+      <p class="note">Appuie sur un message pour réagir, répondre, copier, modifier ou supprimer le tien. Tu peux envoyer des photos, des PDF (3 Mo maximum) et des vocaux (maintiens le micro, glisse à gauche pour annuler), et lancer un appel vocal ou vidéo de groupe avec le bouton téléphone en haut. Les photos sont réduites automatiquement. En mode économique, elles restent masquées jusqu'à ce que tu appuies dessus.</p>
     </div>`;
   p.querySelector('#close').onclick = closePanel;
 }
