@@ -29,6 +29,15 @@
   <div id="splash" aria-hidden="true"><span class="astre"></span><b>EnR Connect</b><small>Énergies renouvelables</small><span class="barre"><i></i></span></div>
   <div id="app"></div>
   <script>
+    // Diagnostic : garde la dernière erreur (code qui plante, fichier introuvable) pour l'afficher sur l'écran de chargement
+    window.__erreurs = [];
+    window.addEventListener('error', function (e) {
+      var t = e.target && (e.target.src || e.target.href);
+      window.__erreurs.push(t ? 'Fichier non chargé : ' + String(t).split('/').slice(-2).join('/') : (e.message || 'Erreur') + (e.lineno ? ' (ligne ' + e.lineno + ')' : ''));
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e.reason; window.__erreurs.push('Promesse refusée : ' + ((r && (r.message || r.code)) || String(r)));
+    });
     // Filet de sécurité : si le code de l'appli n'a pas démarré après 9 s (site en cours de mise à jour, fichier introuvable, vieux cache),
     // on le dit au lieu de tourner dans le vide, et on propose de tout recharger proprement.
     setTimeout(function () {
@@ -36,6 +45,7 @@
       var d = document.createElement('div');
       d.style.cssText = 'position:absolute;left:0;right:0;bottom:16%;text-align:center;padding:0 28px';
       d.innerHTML = '<p style="margin:0 0 14px;color:#cfe0de;font-size:.95rem">Le chargement prend plus de temps que prévu.</p>'
+        + '<p style="margin:0 0 14px;color:#F5A623;font-size:.72rem;word-break:break-word;opacity:.85">' + (window.__erreurs.length ? window.__erreurs.slice(-3).map(function (x) { return String(x).replace(/</g, '&lt;'); }).join('<br>') : 'Aucune erreur détectée : le fichier de l\'appli n\'a pas répondu.') + '</p>'
         + '<button id="spr" style="border:0;border-radius:14px;padding:13px 26px;font:700 1rem system-ui,sans-serif;background:#F5A623;color:#1b2a22">Réessayer</button>';
       sp.appendChild(d);
       document.getElementById('spr').onclick = async function () {
