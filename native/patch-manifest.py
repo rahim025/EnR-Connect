@@ -29,5 +29,9 @@ permissions = '''
 if 'WatcherService' not in s:
     s = s.replace('</application>', composants + '    </application>', 1)
     s = s.replace('</manifest>', permissions + '</manifest>', 1)
+# Micro (vocaux, appels) et caméra (appels) : sans ces lignes, Android ne propose jamais l'autorisation
+for perm in ('RECORD_AUDIO', 'MODIFY_AUDIO_SETTINGS', 'CAMERA'):
+    if 'android.permission.' + perm + '"' not in s:
+        s = s.replace('</manifest>', '    <uses-permission android:name="android.permission.' + perm + '" />\n</manifest>', 1)
 open(p, 'w', encoding='utf-8').write(s)
 print(s)
