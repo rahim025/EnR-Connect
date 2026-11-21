@@ -1145,7 +1145,14 @@ function envoyerMessage(text, kind = 'text') {
   const data = { uid: state.user.uid, name: nomAffiche(state.user), kind, text, av: monAv(), createdAt: serverTimestamp() };
   if (state.reply) { data.reply = { id: state.reply.id, name: state.reply.name, extrait: state.reply.extrait }; state.reply = null; majContexte(); }
   enableNetwork(db).catch(() => {}); // sécurité : si la connexion était coupée en arrière-plan, on la rétablit
-  addDoc(collection(db, 'messages'), data).catch(e => { console.error(e); toast(e && e.code === 'permission-denied' ? 'Envoi refusé par le serveur (règles Firestore).' : 'Message non envoyé.'); }); // pas de await : hors ligne, le message reste en attente
+  // Si le serveur n'accuse pas réception en 12 s, on prévient (sinon le message reste « en attente » sans explication)
+  const veille = setTimeout(() => toast('Le message n\'arrive pas au serveur. Réseau ou quota Firebase ? Réessaie plus tard.'), 12000);
+  addDoc(collection(db, 'messages'), data)
+    .then(() => clearTimeout(veille))
+    .catch(e => {
+      clearTimeout(veille); console.error(e);
+      toast(e && e.code === 'permission-denied' ? 'Envoi refusé par le serveur (règles Firestore).' : 'Message non envoyé (' + ((e && e.code) || 'erreur') + ').');
+    }); // pas de await : hors ligne, le message reste en attente
 }
 
 function envoyer() {
