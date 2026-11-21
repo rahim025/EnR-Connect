@@ -492,11 +492,11 @@ function confirmer(titre, texte, bouton, annuler = 'Annuler', neutre = false) {
   });
 }
 
-function toast(texte) {
+function toast(texte, ms = 3200) {
   const t = document.createElement('div');
   t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = texte;
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3200);
+  setTimeout(() => t.remove(), ms);
 }
 
 /* Réglage « Micro » : autoriser depuis l'appli, ou ouvrir les réglages Android si le micro a été refusé */
@@ -1141,12 +1141,27 @@ function modifierProfil() {
   rendre();
 }
 
+// Test direct du serveur Firebase (hors Firestore SDK) pour savoir pourquoi un message reste « en attente »
+async function diagnostic() {
+  try {
+    const jeton = await state.user.getIdToken();
+    const url = 'https://firestore.googleapis.com/v1/projects/' + firebaseConfig.projectId + '/databases/(default)/documents/presence/diag_' + state.user.uid;
+    const r = await fetch(url, { method: 'PATCH', headers: { Authorization: 'Bearer ' + jeton, 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: { t: { integerValue: String(Date.now()) } } }) });
+    if (r.ok) { toast('Test : le serveur accepte les écritures (HTTP 200). Le blocage vient de la connexion de l\'appli.', 9000); return; }
+    const j = await r.json().catch(() => null);
+    const st = (j && j.error && j.error.status) || '';
+    toast('Test : le serveur répond HTTP ' + r.status + ' ' + st + (st === 'RESOURCE_EXHAUSTED' ? ' (quota Firebase dépassé)' : st === 'PERMISSION_DENIED' ? ' (règles Firestore)' : ''), 9000);
+  } catch (e) {
+    toast('Test : impossible de joindre Firebase (réseau bloqué ou coupé).', 9000);
+  }
+}
+
 function envoyerMessage(text, kind = 'text') {
   const data = { uid: state.user.uid, name: nomAffiche(state.user), kind, text, av: monAv(), createdAt: serverTimestamp() };
   if (state.reply) { data.reply = { id: state.reply.id, name: state.reply.name, extrait: state.reply.extrait }; state.reply = null; majContexte(); }
   enableNetwork(db).catch(() => {}); // sécurité : si la connexion était coupée en arrière-plan, on la rétablit
   // Si le serveur n'accuse pas réception en 12 s, on prévient (sinon le message reste « en attente » sans explication)
-  const veille = setTimeout(() => toast('Le message n\'arrive pas au serveur. Réseau ou quota Firebase ? Réessaie plus tard.'), 12000);
+  const veille = setTimeout(() => { toast('Le message n\'arrive pas au serveur. Test en cours…', 4000); diagnostic(); }, 12000);
   addDoc(collection(db, 'messages'), data)
     .then(() => clearTimeout(veille))
     .catch(e => {
