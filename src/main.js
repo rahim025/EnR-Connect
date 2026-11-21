@@ -563,7 +563,10 @@ function subscribeMessages() {
         .reverse();
       renderFeed();
     },
-    e => console.error(e)
+    e => {
+      console.error(e);
+      toast(e && e.code === 'permission-denied' ? 'Lecture refusée par le serveur (règles Firestore).' : 'Impossible de charger les messages. Vérifie ta connexion.');
+    }
   );
 }
 
@@ -593,7 +596,10 @@ document.addEventListener('visibilitychange', () => {
     enableNetwork(db).catch(() => {});
   }
 });
-window.addEventListener('online', renderStatut);
+const rebrancher = () => { if (state.user && document.visibilityState !== 'hidden') enableNetwork(db).catch(() => {}); };
+window.addEventListener('focus', rebrancher);
+window.addEventListener('pageshow', rebrancher);
+window.addEventListener('online', () => { rebrancher(); renderStatut(); });
 window.addEventListener('offline', renderStatut);
 
 function renderShell() {
@@ -1138,6 +1144,7 @@ function modifierProfil() {
 function envoyerMessage(text, kind = 'text') {
   const data = { uid: state.user.uid, name: nomAffiche(state.user), kind, text, av: monAv(), createdAt: serverTimestamp() };
   if (state.reply) { data.reply = { id: state.reply.id, name: state.reply.name, extrait: state.reply.extrait }; state.reply = null; majContexte(); }
+  enableNetwork(db).catch(() => {}); // sécurité : si la connexion était coupée en arrière-plan, on la rétablit
   addDoc(collection(db, 'messages'), data).catch(e => { console.error(e); toast(e && e.code === 'permission-denied' ? 'Envoi refusé par le serveur (règles Firestore).' : 'Message non envoyé.'); }); // pas de await : hors ligne, le message reste en attente
 }
 
