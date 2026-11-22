@@ -1,3 +1,4 @@
+import './diagnostic.js';
 import './update.js';
 // Appli Android : la page passe sous la barre d'état, on lit sa hauteur auprès du natif
 try {
