@@ -1020,14 +1020,24 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .send[data-mode="micro"] .i-micro, .capsule .send[data-mode="micro"] .i-micro { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .send[data-mode="micro"] .i-micro svg { width: 22px; height: 22px; }
 .send.enreg { transform: scale(1.35); background: #E5484D; color: #fff; box-shadow: 0 0 0 8px #E5484D55; transition: transform .15s ease; }
-.vocal { display: flex; align-items: center; gap: 8px; min-width: 230px; }
-.vocal .pl { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #F5A62333; color: inherit; font-size: .95rem; padding: 0; }
-.vocal .onde { flex: 1; height: 32px; display: flex; align-items: center; gap: 2px; cursor: pointer; }
-.vocal .onde i { flex: 1; min-width: 2px; border-radius: 2px; background: currentColor; opacity: .35; }
+/* Vocaux : carte lecteur (bouton rond, onde fine avec curseur, temps écoulé / total, vitesse) */
+.vocal { display: flex; align-items: center; gap: 11px; min-width: 240px; padding: 2px 2px 2px 0; }
+.vocal .pl { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; padding: 0; border: 0; cursor: pointer; transition: transform .12s ease; }
+.vocal .pl svg { width: 20px; height: 20px; }
+.vocal .pl:active { transform: scale(.92); }
+.bulle.moi .vocal .pl { background: #3a2200; color: #F5A623; }
+.bulle.autre .vocal .pl { background: #F5A623; color: #3a2200; }
+.vocal .mid { flex: 1; min-width: 0; }
+.vocal .onde { position: relative; height: 30px; display: flex; align-items: center; gap: 2px; cursor: pointer; }
+.vocal .onde i { flex: 1; min-width: 2px; border-radius: 2px; background: currentColor; opacity: .35; transition: opacity .12s; }
 .vocal .onde i.fait { opacity: 1; }
-.vocal .tps { flex: none; min-width: 2.4em; text-align: right; font-size: .78rem; opacity: .85; }
-.vocal .vit { flex: none; font: inherit; font-size: .72rem; font-weight: 700; padding: 3px 7px; border-radius: 99px; background: #0003; color: inherit; }
-.vocal .vit[hidden] { display: none; }
+.vocal .th { display: none; position: absolute; top: 50%; left: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: currentColor; pointer-events: none; }
+.vocal .mt { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; font-size: .75rem; font-variant-numeric: tabular-nums; }
+.vocal .tps, .vocal .tot { font-size: .75rem; opacity: .9; }
+.vocal .dr { display: flex; align-items: center; gap: 8px; height: 22px; }
+.vocal .vit { flex: none; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 34px; height: 22px; padding: 0 8px; margin: 0; font: inherit; font-size: .72rem; font-weight: 700; line-height: 1; letter-spacing: 0; text-align: center; font-variant-numeric: tabular-nums; border-radius: 99px; background: #0003; color: inherit; border: 0; cursor: pointer; }
+.bulle.autre .vocal .vit { background: #ffffff1f; }
+.vocal .vit[hidden], .vocal .tot[hidden] { display: none; }
 
 /* Badge Admin / Créateur à côté du nom dans le chat */
 .qui { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -1035,3 +1045,29 @@ mark { background: #F5A62366; color: inherit; border-radius: 4px; padding: 0 2px
 .badge-role svg { width: 11px; height: 11px; flex: none; }
 .badge-role.createur { background: linear-gradient(135deg, #F5B93A, #E8871E); color: #fff; }
 .bulle.annonce .qui .badge-role { margin-left: auto; }
+
+/* Toucher expressif : plus de bleu, retour ambré bien visible au doigt */
+html, body, * { -webkit-tap-highlight-color: transparent; }
+:root { accent-color: #F5A623; caret-color: #F5A623; }
+::selection { background: #F5A62377; color: inherit; }
+::-moz-selection { background: #F5A62377; color: inherit; }
+button:focus, a:focus, [role="button"]:focus, input:focus, textarea:focus { outline: none; }
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 2px solid #F5A623cc; outline-offset: 2px; box-shadow: none; }
+input, textarea, [contenteditable] { caret-color: #F5A623; }
+/* champs : bordure ambrée franche + halo */
+.ligne-envoi textarea:focus-visible, .champ-dialogue:focus { border-color: #F5A623; box-shadow: 0 0 0 4px #F5A62340; }
+.capsule:focus-within { border-color: #F5A623; box-shadow: 0 0 0 4px #F5A62333, 0 0 18px #F5A62340; }
+/* appui : voile ambré net + petit rebond */
+button, .icone, .send, .puce, .rangee, .bulle, .media-masque, .fichier-pdf { transition: transform .12s ease, background-color .12s ease, filter .12s ease, box-shadow .12s ease; }
+.icone:active, .capsule .icone:active, button.rangee:active, label.rangee:active, .menu-joindre .puce:active { background: #F5A62340; transform: scale(.9); }
+.send:active, .capsule .send:active { transform: scale(.88); background: #E8890C; box-shadow: 0 0 0 8px #F5A62340; }
+.bulle:active { filter: brightness(1.15); transform: scale(.985); }
+.media-masque:active, .fichier-pdf:active { filter: brightness(1.12); transform: scale(.98); }
+.vocal .pl:active { transform: scale(.88); box-shadow: 0 0 0 6px #F5A62340; }
+
+/* Anti-bleu au toucher : plus de sélection de texte ni de cadre de focus système sur l'interface */
+*, *::before, *::after { -webkit-tap-highlight-color: rgba(0,0,0,0); -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+*:focus { outline: none; }
+img, svg { -webkit-user-drag: none; user-drag: none; }
+::selection { background: #F5A62355; color: inherit; }

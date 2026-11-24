@@ -752,11 +752,14 @@ function contenuHTML(m) {
   if (m.kind === 'audio') {
     const id = esc(m.mediaId);
     const barres = ondeDe(m);
-    return `<div class="vocal"><button type="button" class="pl" data-audio="${id}" aria-label="Lire le vocal">▶</button><div class="onde" data-onde="${id}">${barres.map(h => `<i style="height:${h}%"></i>`).join('')}</div><small class="tps" data-total="${m.duree || 0}">${dureeTxt(m.duree || 0)}</small><button type="button" class="vit" data-vitesse="1" hidden>${vitesse}×</button></div>`;
+    const total = dureeTxt(m.duree || 0);
+    return `<div class="vocal"><button type="button" class="pl" data-audio="${id}" aria-label="Lire le vocal">${IC_PLAY}</button><div class="mid"><div class="onde" data-onde="${id}">${barres.map(h => `<i style="height:${h}%"></i>`).join('')}<span class="th"></span></div><div class="mt"><small class="tps" data-total="${m.duree || 0}">${total}</small><span class="dr"><button type="button" class="vit" data-vitesse="1" hidden>${vitesse}×</button><small class="tot" hidden>${total}</small></span></div></div></div>`;
   }
   return `<div class="texte">${lierURL(esc(m.text)).replace(/\n/g, '<br>')}${m.editedAt ? '<span class="modifie">modifié</span>' : ''}</div>`;
 }
 
+const IC_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
+const IC_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4.2" height="14" rx="1.4"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.4"/></svg>';
 const REACTIONS = [['coeur', '❤️'], ['pouce', '👍'], ['rire', '😂'], ['wow', '😮'], ['triste', '😢'], ['merci', '🙏']];
 const trouver = id => state.messages.find(m => m.id === id);
 const extrait = (m, n = 90) => m.kind === 'image' ? '📷 Photo' : m.kind === 'audio' ? '🎤 Message vocal' : m.kind === 'pdf' ? '📄 ' + (m.nom || 'PDF') : String(m.text || '').replace(/\s+/g, ' ').trim().slice(0, n);
@@ -1451,13 +1454,18 @@ function majVocaux() {
   document.querySelectorAll('.vocal').forEach(bloc => {
     const pl = bloc.querySelector('.pl'); if (!pl) return;
     const cur = lecture && lecture.id === pl.dataset.audio ? lecture : null;
-    pl.textContent = cur && !cur.a.paused ? '⏸' : '▶';
+    const joue = !!(cur && !cur.a.paused);
+    pl.innerHTML = joue ? IC_PAUSE : IC_PLAY;
+    pl.setAttribute('aria-label', joue ? 'Mettre en pause' : 'Lire le vocal');
+    bloc.classList.toggle('joue', joue);
     const barres = bloc.querySelectorAll('.onde i');
     const ratio = cur && cur.duree ? Math.min(1, cur.a.currentTime / cur.duree) : 0;
     const n = Math.floor(ratio * barres.length);
     barres.forEach((x, i) => x.classList.toggle('fait', i < n));
+    const th = bloc.querySelector('.th'); if (th) { th.style.left = (ratio * 100) + '%'; th.style.display = ratio > 0 ? 'block' : 'none'; }
     const tps = bloc.querySelector('.tps');
     if (tps) tps.textContent = dureeTxt(Math.floor(cur ? cur.a.currentTime : Number(tps.dataset.total || 0)));
+    const tot = bloc.querySelector('.tot'); if (tot) tot.hidden = !cur;
     const vit = bloc.querySelector('.vit'); if (vit) { vit.hidden = !cur; vit.textContent = vitesse + '×'; }
   });
 }
