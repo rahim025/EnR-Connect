@@ -24,9 +24,18 @@ public class WatcherService extends Service {
             } else {
                 startForeground(2, Notifier.pourService(this));
             }
-        } catch (Exception e) {
-            // Certains téléphones refusent le service : on l'arrête au lieu de faire planter toute l'appli
+        } catch (Throwable e) {
+            // Certains téléphones (Huawei, etc.) refusent le service. Android plante l'appli si le service
+            // s'arrête sans être passé au premier plan : on tente donc une notification minimale avant d'arrêter.
             Log.w("EnR", "Service de réception impossible : " + e);
+            try {
+                android.app.Notification n = new androidx.core.app.NotificationCompat.Builder(this, Notifier.CANAL_SERVICE)
+                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setContentTitle("EnR Connect")
+                        .build();
+                startForeground(2, n);
+            } catch (Throwable ignore) { /* ignoré */ }
+            try { stopForeground(true); } catch (Throwable ignore) { /* ignoré */ }
             stopSelf();
             return START_NOT_STICKY;
         }
