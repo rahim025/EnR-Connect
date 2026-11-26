@@ -18,10 +18,17 @@ public class WatcherService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(2, Notifier.pourService(this), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-        } else {
-            startForeground(2, Notifier.pourService(this));
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(2, Notifier.pourService(this), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(2, Notifier.pourService(this));
+            }
+        } catch (Exception e) {
+            // Certains téléphones refusent le service : on l'arrête au lieu de faire planter toute l'appli
+            Log.w("EnR", "Service de réception impossible : " + e);
+            stopSelf();
+            return START_NOT_STICKY;
         }
         if (!actif) {
             actif = true;

@@ -36,8 +36,13 @@ public class MessageWatcherPlugin extends Plugin {
                 .putString("idToken", null)
                 .putLong("idExp", 0)
                 .apply();
-        Intent i = new Intent(c, WatcherService.class);
-        ContextCompat.startForegroundService(c, i);
+        try {
+            Intent i = new Intent(c, WatcherService.class);
+            ContextCompat.startForegroundService(c, i);
+        } catch (Exception ex) {
+            // Le téléphone refuse le service en arrière-plan : l'appli continue sans notifications
+            android.util.Log.w("EnR", "Démarrage du service refusé : " + ex);
+        }
         call.resolve();
     }
 
