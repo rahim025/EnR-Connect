@@ -355,7 +355,7 @@ async function gererUtilisateur(user) {
   try { localStorage.setItem('deja-connecte', '1'); } catch { /* ignoré */ }
   if (!user.emailVerified && !estPseudo(user)) return renderLogin('Utilise un compte Google dont l\'adresse est vérifiée.');
   state.role = await resolveRole(user);
-  localStorage.setItem('role:' + mailOf(user), state.role);
+  try { localStorage.setItem('role:' + mailOf(user), state.role); } catch { /* ignoré */ }
   if (state.role === 'refused') return renderRefused();
   if (!accueilVu(user.uid)) return afficherAccueilGroupe(user.uid, startChat);
   startChat();
